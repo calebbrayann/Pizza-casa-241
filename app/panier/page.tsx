@@ -107,7 +107,7 @@ export default function CartPage() {
                   <div className="flex items-center gap-3 p-3 bg-muted rounded-lg mb-4">
                     <div className="h-10 w-10 relative bg-white rounded-full overflow-hidden">
                       <Image
-                        src={pizzeria.logo || "/placeholder.svg"}
+                        src={pizzeria.logo || "/logo.jpg"}
                         alt={pizzeria.name}
                         fill
                         className="object-cover"

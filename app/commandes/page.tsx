@@ -146,6 +146,24 @@ export default function OrdersPage() {
                           </div>
                           <div>{formatPrice(item.price * item.quantity)}</div>
                         </div>
+                      </CardHeader>
+                      <CardContent>
+                        {pizzeria && (
+                          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg mb-4">
+                            <div className="h-10 w-10 relative bg-white rounded-full overflow-hidden">
+                              <Image
+                                src={pizzeria.logo || "/logo.jpg"}
+                                alt={pizzeria.name}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">{pizzeria.name}</h3>
+                              <p className="text-sm text-muted-foreground">{pizzeria.address}</p>
+                            </div>
+                          </div>
+                        )}
                       ))}
                     </div>
 
