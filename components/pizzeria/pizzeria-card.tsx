@@ -34,7 +34,7 @@ export function PizzeriaCard({ pizzeria }: PizzeriaCardProps) {
           <div className="flex items-center gap-2">
             <div className="h-12 w-12 relative bg-white rounded-full overflow-hidden border-2 border-white">
               <Image
-                src={pizzeria.logo || "/placeholder.svg"}
+                src={pizzeria.logo || "/logo.jpg"}
                 alt={`Logo ${pizzeria.name}`}
                 fill
                 className="object-cover"

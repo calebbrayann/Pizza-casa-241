@@ -190,7 +190,7 @@ export default function AdminDashboardPage() {
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-md bg-muted relative overflow-hidden">
                           <img
-                            src={pizzeria.logo || "/placeholder.svg"}
+                            src={pizzeria.logo || "/logo.jpg"}
                             alt={pizzeria.name}
                             className="object-cover w-full h-full"
                           />

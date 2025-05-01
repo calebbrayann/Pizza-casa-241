@@ -177,7 +177,7 @@ export default function DeliveryDashboardPage() {
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="h-8 w-8 relative bg-white rounded-full overflow-hidden">
                                     <Image
-                                      src={pizzeria.logo || "/placeholder.svg"}
+                                      src={pizzeria.logo || "/logo.jpg"}
                                       alt={pizzeria.name}
                                       fill
                                       className="object-cover"
@@ -245,7 +245,7 @@ export default function DeliveryDashboardPage() {
                           {pizzeria && (
                             <div className="h-10 w-10 relative bg-white rounded-full overflow-hidden">
                               <Image
-                                src={pizzeria.logo || "/placeholder.svg"}
+                                src={pizzeria.logo || "/logo.jpg"}
                                 alt={pizzeria.name}
                                 fill
                                 className="object-cover"
