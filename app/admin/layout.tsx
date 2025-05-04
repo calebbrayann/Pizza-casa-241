@@ -86,8 +86,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <SheetContent side="left" className="flex flex-col p-0">
             <div className="flex items-center border-b px-4 py-3">
               <Link href="/admin" className="flex items-center gap-2">
-                <div className="relative h-8 w-8">
-                  <Image src="sep13.png" alt="Pizza Casa Logo" fill className="object-contain" />
+                <div className="relative h-6 w-6">
+                  <Image src="log1.jpg" alt="Pizza Casa Logo" fill className="object-contain" />
                 </div>
                 <span className="text-lg font-bold text-[#FFB000] font-montserrat">Admin</span>
               </Link>
@@ -130,8 +130,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </SheetContent>
         </Sheet>
         <Link href="/admin" className="flex items-center gap-2 md:hidden">
-          <div className="relative h-8 w-8">
-            <Image src="sep13.png" alt="Pizza Casa Logo" fill className="object-contain" />
+          <div className="relative h-6 w-6">
+            <Image src="log1.jpg" alt="Pizza Casa Logo" fill className="object-contain" />
           </div>
           <span className="text-lg font-bold text-[#FFB000] font-montserrat">Pizza Casa Admin</span>
         </Link>
@@ -151,8 +151,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <aside className="hidden w-64 shrink-0 border-r bg-background md:flex md:flex-col">
           <div className="flex h-16 items-center border-b px-6">
             <Link href="/admin" className="flex items-center gap-2">
-              <div className="relative h-8 w-8">
-                <Image src="/sep13.png" alt="Pizza Casa Logo" fill className="object-contain" />
+              <div className="relative h-6 w-6">
+                <Image src="log1.jpg" alt="Pizza Casa Logo" fill className="object-contain" />
               </div>
               <span className="text-lg font-bold text-[#FFB000] font-montserrat">Admin</span>
             </Link>

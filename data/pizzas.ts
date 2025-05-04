@@ -275,7 +275,7 @@ export const pizzas: Pizza[] = [
       "name": "Pollo e Pesto",
       "description": "Poulet grillé, pesto maison et tomates cerises",
       "price": 10200,
-      "image": "/pollo_pesto.avif?height=300&width=300",
+      "image": "/p1.avif",
       "category": "Spécialités",
       "ingredients": ["Sauce tomate", "Mozzarella", "Poulet grillé", "Pesto", "Tomates cerises"],
       "sizes": {
@@ -290,7 +290,7 @@ export const pizzas: Pizza[] = [
       "name": "Calzone Roma",
       "description": "Calzone spécial de la maison farci de saucisse italienne, brocolis et provolone",
       "price": 9500,
-      "image": "/calzone_roma.avif?height=300&width=300",
+      "image": "/corleone.avif",
       "category": "Calzones",
       "ingredients": ["Sauce tomate", "Mozzarella", "Saucisse italienne", "Brocolis", "Provolone"],
       "sizes": {
@@ -303,7 +303,7 @@ export const pizzas: Pizza[] = [
       "name": "Calzone Spinaci e Ricotta",
       "description": "Calzone végétarien aux épinards frais et à la ricotta crémeuse",
       "price": 9200,
-      "image": "/calzone_spinaci.avif?height=300&width=300",
+      "image": "/pizza15.avif",
       "category": "Calzones",
       "ingredients": ["Sauce tomate", "Mozzarella", "Épinards", "Ricotta", "Ail"],
       "sizes": {
