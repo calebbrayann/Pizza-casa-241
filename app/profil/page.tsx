@@ -592,7 +592,7 @@ export default function AccountPage() {
                             <div className="flex justify-between items-start">
                               <div className="flex gap-4">
                                 <div className="relative h-16 w-16 rounded-md overflow-hidden">
-                                  <Image src="/placeholder.svg" alt="Margherita" fill className="object-cover" />
+                                  <Image src="/pizzaclient9.avif" alt="Margherita" fill className="object-cover" />
                                 </div>
                                 <div>
                                   <h3 className="font-bold">Margherita</h3>
@@ -617,7 +617,7 @@ export default function AccountPage() {
                             <div className="flex justify-between items-start">
                               <div className="flex gap-4">
                                 <div className="relative h-16 w-16 rounded-md overflow-hidden">
-                                  <Image src="/placeholder.svg" alt="Regina" fill className="object-cover" />
+                                  <Image src="/hero.avif" alt="Regina" fill className="object-cover" />
                                 </div>
                                 <div>
                                   <h3 className="font-bold">Regina</h3>
