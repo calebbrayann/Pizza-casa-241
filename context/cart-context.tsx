@@ -20,8 +20,8 @@ interface CartContextType {
   setPizzeriaId: (id: string) => void
   totalItems: number
   subtotal: number
-  deliveryFee: number
   total: number
+  saveCartToStorage: () => void
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -39,36 +39,50 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [pizzeriaId, setPizzeriaId] = useState<string | null>(null)
   const { toast } = useToast()
 
-  // Load cart from localStorage on initial render
+  // Charger le panier depuis le localStorage au démarrage
   useEffect(() => {
-    const savedCart = localStorage.getItem("pizza-casa-cart")
-    const savedPizzeriaId = localStorage.getItem("pizza-casa-pizzeria")
+    // Vérifier si nous sommes dans un environnement navigateur
+    if (typeof window !== "undefined") {
+      try {
+        const savedCart = localStorage.getItem("pizza-casa-cart")
+        const savedPizzeriaId = localStorage.getItem("pizza-casa-pizzeria")
 
-    if (savedCart) {
-      setItems(JSON.parse(savedCart))
-    }
+        if (savedCart) {
+          setItems(JSON.parse(savedCart))
+        }
 
-    if (savedPizzeriaId) {
-      setPizzeriaId(savedPizzeriaId)
+        if (savedPizzeriaId) {
+          setPizzeriaId(savedPizzeriaId)
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement du panier:", error)
+      }
     }
   }, [])
 
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("pizza-casa-cart", JSON.stringify(items))
-  }, [items])
+  // Sauvegarder le panier dans le localStorage à chaque modification
+  const saveCartToStorage = () => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("pizza-casa-cart", JSON.stringify(items))
 
-  // Save pizzeriaId to localStorage whenever it changes
-  useEffect(() => {
-    if (pizzeriaId) {
-      localStorage.setItem("pizza-casa-pizzeria", pizzeriaId)
-    } else {
-      localStorage.removeItem("pizza-casa-pizzeria")
+        if (pizzeriaId) {
+          localStorage.setItem("pizza-casa-pizzeria", pizzeriaId)
+        } else {
+          localStorage.removeItem("pizza-casa-pizzeria")
+        }
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde du panier:", error)
+      }
     }
-  }, [pizzeriaId])
+  }
+
+  // Sauvegarder le panier à chaque modification des items
+  useEffect(() => {
+    saveCartToStorage()
+  }, [items, pizzeriaId])
 
   const addItem = (pizza: Pizza, quantity: number, specialInstructions?: string) => {
-    // Check if we're trying to add from a different pizzeria
     if (pizzeriaId && pizza.pizzeriaId !== pizzeriaId && items.length > 0) {
       toast({
         title: "Attention",
@@ -95,17 +109,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
-    // Set pizzeriaId if it's the first item
     if (!pizzeriaId) {
       setPizzeriaId(pizza.pizzeriaId)
     }
 
     setItems((prevItems) => {
-      // Check if item already exists in cart
       const existingItemIndex = prevItems.findIndex((item) => item.pizza.id === pizza.id)
 
       if (existingItemIndex >= 0) {
-        // Update existing item
         const updatedItems = [...prevItems]
         updatedItems[existingItemIndex] = {
           ...updatedItems[existingItemIndex],
@@ -114,7 +125,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         }
         return updatedItems
       } else {
-        // Add new item
         return [...prevItems, { pizza, quantity, specialInstructions }]
       }
     })
@@ -128,7 +138,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const removeItem = (pizzaId: string) => {
     setItems((prevItems) => prevItems.filter((item) => item.pizza.id !== pizzaId))
 
-    // If cart becomes empty, reset pizzeriaId
     if (items.length === 1 && items[0].pizza.id === pizzaId) {
       setPizzeriaId(null)
     }
@@ -153,11 +162,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setPizzeriaId(null)
   }
 
-  // Calculate totals
+  // Calculer les totaux
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
   const subtotal = items.reduce((sum, item) => sum + item.pizza.price * item.quantity, 0)
-  const deliveryFee = subtotal > 0 ? 1500 : 0 // 1500 FCFA delivery fee if cart has items
-  const total = subtotal + deliveryFee
+  //const deliveryFee = subtotal > 0 ? 1500 : 0; // Supprimer cette ligne
+  const total = subtotal // Modifier cette ligne
 
   return (
     <CartContext.Provider
@@ -171,8 +180,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         setPizzeriaId,
         totalItems,
         subtotal,
-        deliveryFee,
         total,
+        saveCartToStorage,
       }}
     >
       {children}
