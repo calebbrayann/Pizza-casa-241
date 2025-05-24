@@ -16,7 +16,6 @@ import {
 import type { Pizza } from "@/types/pizza"
 import { createPizza, updatePizza } from "@/app/api/pizza/actions"
 import { useToast } from "@/hooks/use-toast"
-import ImageUpload from "@/components/ui/image-upload"
 
 interface PizzaFormProps {
   pizza?: Pizza
@@ -27,6 +26,7 @@ interface PizzaFormProps {
 export default function PizzaForm({ pizza, onSubmit, onCancel }: PizzaFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [formData, setFormData] = useState({
     name: pizza?.name || "",
     description: pizza?.description || "",
@@ -44,23 +44,53 @@ export default function PizzaForm({ pizza, onSubmit, onCancel }: PizzaFormProps)
     pizzeriaId: pizza?.pizzeriaId || "",
   })
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedImage(file)
+      // Créer une URL temporaire pour l'aperçu
+      const imageUrl = URL.createObjectURL(file)
+      setFormData(prev => ({ ...prev, image: imageUrl }))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      const pizzaData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        ingredients: formData.ingredients.split(",").map((i) => i.trim()),
-        sizes: {
-          small: formData.sizes.small ? parseFloat(formData.sizes.small) : undefined,
-          medium: formData.sizes.medium ? parseFloat(formData.sizes.medium) : undefined,
-          large: formData.sizes.large ? parseFloat(formData.sizes.large) : undefined,
-        },
+      // Si une image a été sélectionnée, la convertir en base64
+      if (selectedImage) {
+        const reader = new FileReader()
+        reader.onloadend = async () => {
+          const base64Image = reader.result as string
+          const pizzaData = {
+            ...formData,
+            price: parseFloat(formData.price),
+            ingredients: formData.ingredients.split(",").map((i) => i.trim()),
+            sizes: {
+              small: formData.sizes.small ? parseFloat(formData.sizes.small) : undefined,
+              medium: formData.sizes.medium ? parseFloat(formData.sizes.medium) : undefined,
+              large: formData.sizes.large ? parseFloat(formData.sizes.large) : undefined,
+            },
+            image: base64Image
+          }
+          await onSubmit(pizzaData)
+        }
+        reader.readAsDataURL(selectedImage)
+      } else {
+        const pizzaData = {
+          ...formData,
+          price: parseFloat(formData.price),
+          ingredients: formData.ingredients.split(",").map((i) => i.trim()),
+          sizes: {
+            small: formData.sizes.small ? parseFloat(formData.sizes.small) : undefined,
+            medium: formData.sizes.medium ? parseFloat(formData.sizes.medium) : undefined,
+            large: formData.sizes.large ? parseFloat(formData.sizes.large) : undefined,
+          }
+        }
+        await onSubmit(pizzaData)
       }
-
-      await onSubmit(pizzaData)
     } catch (error) {
       console.error("Erreur lors de la soumission:", error)
     } finally {
@@ -149,11 +179,22 @@ export default function PizzaForm({ pizza, onSubmit, onCancel }: PizzaFormProps)
 
         <div className="space-y-1">
           <Label htmlFor="image" className="text-xs">Image</Label>
-          <ImageUpload
-            value={formData.image}
-            onChange={(url) => setFormData({ ...formData, image: url })}
-            folder="pizzas"
+          <Input
+            id="image"
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="cursor-pointer"
           />
+          {formData.image && formData.image !== "/placeholder.svg?height=200&width=300" && (
+            <div className="mt-2">
+              <img
+                src={formData.image}
+                alt="Aperçu"
+                className="w-32 h-32 object-cover rounded-md"
+              />
+            </div>
+          )}
         </div>
       </div>
 

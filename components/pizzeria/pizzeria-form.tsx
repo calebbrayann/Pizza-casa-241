@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Pizzeria, PizzeriaStatus } from "@/types/pizzeria"
-import ImageUpload from "@/components/ui/image-upload"
 
 interface PizzeriaFormProps {
   pizzeria?: Pizzeria
@@ -19,6 +18,7 @@ interface PizzeriaFormProps {
 
 export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [formData, setFormData] = useState<Partial<Pizzeria>>(
     pizzeria || {
       name: "",
@@ -40,6 +40,16 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedImage(file)
+      // Créer une URL temporaire pour l'aperçu
+      const imageUrl = URL.createObjectURL(file)
+      setFormData((prev) => ({ ...prev, image: imageUrl }))
+    }
+  }
+
   const handleStatusChange = (value: string) => {
     setFormData((prev) => ({ ...prev, status: value as PizzeriaStatus }))
   }
@@ -59,7 +69,17 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
     setIsSubmitting(true)
 
     try {
-      await onSubmit(formData)
+      // Si une image a été sélectionnée, la convertir en base64
+      if (selectedImage) {
+        const reader = new FileReader()
+        reader.onloadend = async () => {
+          const base64Image = reader.result as string
+          await onSubmit({ ...formData, image: base64Image })
+        }
+        reader.readAsDataURL(selectedImage)
+      } else {
+        await onSubmit(formData)
+      }
     } catch (error) {
       console.error("Erreur lors de la soumission du formulaire:", error)
     } finally {
@@ -70,10 +90,10 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
   const tagsString = Array.isArray(formData.tags) ? formData.tags.join(", ") : formData.tags
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-w-xl mx-auto">
-      <div className="grid grid-cols-2 gap-3">
+    <form onSubmit={handleSubmit} className="space-y-2 max-w-sm mx-auto">
+      <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
-          <Label htmlFor="name" className="text-sm">Nom</Label>
+          <Label htmlFor="name" className="text-xs">Nom</Label>
           <Input
             id="name"
             name="name"
@@ -84,7 +104,7 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="phone" className="text-sm">Téléphone</Label>
+          <Label htmlFor="phone" className="text-xs">Téléphone</Label>
           <Input
             id="phone"
             name="phone"
@@ -96,7 +116,7 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="address" className="text-sm">Adresse</Label>
+        <Label htmlFor="address" className="text-xs">Adresse</Label>
         <Input
           id="address"
           name="address"
@@ -107,9 +127,9 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
-          <Label htmlFor="opening_hours" className="text-sm">Horaires</Label>
+          <Label htmlFor="opening_hours" className="text-xs">Horaires</Label>
           <Input
             id="opening_hours"
             name="opening_hours"
@@ -119,7 +139,7 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="tags" className="text-sm">Tags</Label>
+          <Label htmlFor="tags" className="text-xs">Tags</Label>
           <Input
             id="tags"
             name="tags"
@@ -131,7 +151,7 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="description" className="text-sm">Description</Label>
+        <Label htmlFor="description" className="text-xs">Description</Label>
         <Textarea
           id="description"
           name="description"
@@ -143,17 +163,29 @@ export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaF
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="image" className="text-sm">Image</Label>
-        <ImageUpload
-          value={formData.image}
-          onChange={(url) => setFormData((prev) => ({ ...prev, image: url }))}
-          folder="pizzerias"
+        <Label htmlFor="image" className="text-xs">Image</Label>
+        <Input
+          id="image"
+          name="image"
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="cursor-pointer"
         />
+        {formData.image && formData.image !== "/placeholder.svg?height=200&width=300" && (
+          <div className="mt-2">
+            <img
+              src={formData.image}
+              alt="Aperçu"
+              className="w-32 h-32 object-cover rounded-md"
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center space-x-2">
         <Checkbox id="active" checked={formData.status === "active"} onCheckedChange={handleActiveChange} />
-        <Label htmlFor="active" className="text-sm">Activer immédiatement</Label>
+        <Label htmlFor="active" className="text-xs">Activer immédiatement</Label>
       </div>
 
       <div className="flex justify-end space-x-2 pt-2">

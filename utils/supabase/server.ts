@@ -53,6 +53,35 @@ export const createClient = async () => {
   }
 }
 
+// Nouvelle fonction pour créer un client avec le service role key
+export const createAdminClient = async () => {
+  try {
+    console.log("Création du client Supabase Admin...")
+    
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Les variables d'environnement Supabase ne sont pas configurées")
+    }
+
+    const client = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        cookies: {
+          get: () => "",
+          set: () => {},
+          remove: () => {},
+        },
+      }
+    )
+
+    console.log("Client Supabase Admin créé avec succès")
+    return client
+  } catch (error) {
+    console.error("Erreur lors de la création du client Supabase Admin:", error)
+    throw error
+  }
+}
+
 export const updateSession = async (request: Request) => {
   try {
     console.log("Mise à jour de la session...")

@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/utils/supabase/server"
+import { createClient, createAdminClient } from "@/utils/supabase/server"
 import type { Pizzeria, PizzeriaFilter, PizzeriaStatus } from "@/types/pizzeria"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
@@ -9,13 +9,9 @@ import { cookies } from "next/headers"
 export async function getPizzerias(filter?: PizzeriaFilter): Promise<Pizzeria[]> {
   const supabase = await createClient()
 
-  // Utiliser une sous-requête pour compter les commandes
   let query = supabase
     .from("pizzerias")
-    .select(`
-      *,
-      orders_count:orders(count)
-    `)
+    .select("*")
     .order("name")
 
   // Appliquer les filtres
@@ -36,30 +32,23 @@ export async function getPizzerias(filter?: PizzeriaFilter): Promise<Pizzeria[]>
     throw new Error("Impossible de récupérer les pizzerias")
   }
 
-  // Dédupliquer les pizzerias en utilisant un Map
-  const uniquePizzerias = new Map()
-  data.forEach((pizzeria) => {
-    if (!uniquePizzerias.has(pizzeria.id)) {
-      uniquePizzerias.set(pizzeria.id, {
-        id: pizzeria.id,
-        name: pizzeria.name,
-        image: pizzeria.image || "/placeholder.svg?height=200&width=300",
-        rating: pizzeria.rating,
-        address: pizzeria.address,
-        phone: pizzeria.phone,
-        opening_hours: pizzeria.opening_hours,
-        tags: pizzeria.tags || [],
-        status: pizzeria.status,
-        orders_count: pizzeria.orders_count?.[0]?.count || 0,
-        revenue: pizzeria.revenue || 0,
-        description: pizzeria.description,
-        created_at: pizzeria.created_at,
-        updated_at: pizzeria.updated_at,
-      })
-    }
-  })
-
-  return Array.from(uniquePizzerias.values())
+  // Transformer les données
+  return data.map((pizzeria) => ({
+    id: pizzeria.id,
+    name: pizzeria.name,
+    image: pizzeria.image || "/placeholder.svg?height=200&width=300",
+    rating: pizzeria.rating,
+    address: pizzeria.address,
+    phone: pizzeria.phone,
+    opening_hours: pizzeria.opening_hours,
+    tags: pizzeria.tags || [],
+    status: pizzeria.status,
+    orders_count: 0, // Valeur par défaut
+    revenue: pizzeria.revenue || 0,
+    description: pizzeria.description,
+    created_at: pizzeria.created_at,
+    updated_at: pizzeria.updated_at,
+  }))
 }
 
 // Récupérer une pizzeria par ID
@@ -97,7 +86,7 @@ export async function getPizzeriaById(id: string): Promise<Pizzeria | null> {
 // Créer une nouvelle pizzeria
 export async function createPizzeria(pizzeriaData: Partial<Pizzeria>): Promise<Pizzeria | null> {
   try {
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     // Préparer les tags si c'est une chaîne de caractères
     let tags = pizzeriaData.tags
@@ -115,8 +104,6 @@ export async function createPizzeria(pizzeriaData: Partial<Pizzeria>): Promise<P
       opening_hours: pizzeriaData.opening_hours,
       tags: tags,
       status: pizzeriaData.status || "active",
-      orders_count: 0,
-      revenue: 0,
       description: pizzeriaData.description,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -156,43 +143,45 @@ export async function createPizzeria(pizzeriaData: Partial<Pizzeria>): Promise<P
 
 // Mettre à jour une pizzeria existante
 export async function updatePizzeria(id: string, pizzeriaData: Partial<Pizzeria>): Promise<Pizzeria | null> {
-  const cookieStore = cookies()
-  const supabase = await createClient(cookieStore)
+  try {
+    const supabase = await createAdminClient()
 
-  // Préparer les tags si c'est une chaîne de caractères
-  let tags = pizzeriaData.tags
-  if (typeof pizzeriaData.tags === "string") {
-    tags = (pizzeriaData.tags as string).split(",").map((tag) => tag.trim())
+    // Préparer les tags si c'est une chaîne de caractères
+    let tags = pizzeriaData.tags
+    if (typeof pizzeriaData.tags === "string") {
+      tags = (pizzeriaData.tags as string).split(",").map((tag) => tag.trim())
+    }
+
+    // Mettre à jour la pizzeria
+    const { error } = await supabase
+      .from("pizzerias")
+      .update({
+        name: pizzeriaData.name,
+        image: pizzeriaData.image,
+        rating: pizzeriaData.rating,
+        address: pizzeriaData.address,
+        phone: pizzeriaData.phone,
+        opening_hours: pizzeriaData.opening_hours,
+        tags: tags,
+        status: pizzeriaData.status,
+        description: pizzeriaData.description,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+
+    if (error) {
+      console.error("Erreur lors de la mise à jour de la pizzeria:", error)
+      throw new Error(`Impossible de mettre à jour la pizzeria: ${error.message}`)
+    }
+
+    revalidatePath("/admin/pizzerias")
+
+    // Récupérer la pizzeria mise à jour
+    return await getPizzeriaById(id)
+  } catch (error) {
+    console.error("Erreur complète lors de la mise à jour de la pizzeria:", error)
+    throw error
   }
-
-  // Mettre à jour la pizzeria
-  const { error } = await supabase
-    .from("pizzerias")
-    .update({
-      name: pizzeriaData.name,
-      image: pizzeriaData.image,
-      rating: pizzeriaData.rating,
-      address: pizzeriaData.address,
-      phone: pizzeriaData.phone,
-      opening_hours: pizzeriaData.opening_hours,
-      tags: tags,
-      status: pizzeriaData.status,
-      orders_count: pizzeriaData.orders_count,
-      revenue: pizzeriaData.revenue,
-      description: pizzeriaData.description,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-
-  if (error) {
-    console.error("Erreur lors de la mise à jour de la pizzeria:", error)
-    throw new Error("Impossible de mettre à jour la pizzeria")
-  }
-
-  revalidatePath("/pizzerias")
-
-  // Récupérer la pizzeria mise à jour
-  return await getPizzeriaById(id)
 }
 
 // Changer le statut d'une pizzeria (activer/désactiver)
@@ -218,15 +207,19 @@ export async function updatePizzeriaStatus(id: string, status: PizzeriaStatus): 
 
 // Supprimer une pizzeria
 export async function deletePizzeria(id: string): Promise<void> {
-  const cookieStore = cookies()
-  const supabase = await createClient(cookieStore)
+  try {
+    const supabase = await createAdminClient()
 
-  const { error } = await supabase.from("pizzerias").delete().eq("id", id)
+    const { error } = await supabase.from("pizzerias").delete().eq("id", id)
 
-  if (error) {
-    console.error("Erreur lors de la suppression de la pizzeria:", error)
-    throw new Error("Impossible de supprimer la pizzeria")
+    if (error) {
+      console.error("Erreur lors de la suppression de la pizzeria:", error)
+      throw new Error(`Impossible de supprimer la pizzeria: ${error.message}`)
+    }
+
+    revalidatePath("/admin/pizzerias")
+  } catch (error) {
+    console.error("Erreur complète lors de la suppression de la pizzeria:", error)
+    throw error
   }
-
-  revalidatePath("/pizzerias")
 }
