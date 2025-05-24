@@ -7,7 +7,8 @@ import Link from "next/link"
 
 export default async function Home() {
   const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
+  const supabase = await createClient()
+
   const {
     data: { session },
   } = await supabase.auth.getSession()
