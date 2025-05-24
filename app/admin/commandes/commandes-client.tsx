@@ -322,13 +322,13 @@ export default function CommandesClient({ initialOrders }: CommandesClientProps)
                             <Avatar className="h-8 w-8">
                               <AvatarImage
                                 src={order.customer_avatar || "/placeholder.svg?height=32&width=32"}
-                                alt={order.customer_name}
+                                alt={order.customer_name || "Client"}
                               />
-                              <AvatarFallback>{order.customer_name.charAt(0)}</AvatarFallback>
+                              <AvatarFallback>{order.customer_name ? order.customer_name.charAt(0) : "C"}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <div className="font-medium">{order.customer_name}</div>
-                              <div className="text-xs text-gray-500">{order.customer_email}</div>
+                              <div className="font-medium">{order.customer_name || "Client"}</div>
+                              <div className="text-xs text-gray-500">{order.customer_email || "Email non disponible"}</div>
                             </div>
                           </div>
                         </TableCell>
@@ -397,13 +397,13 @@ export default function CommandesClient({ initialOrders }: CommandesClientProps)
                       <Avatar className="h-8 w-8">
                         <AvatarImage
                           src={selectedOrder.customer_avatar || "/placeholder.svg?height=32&width=32"}
-                          alt={selectedOrder.customer_name}
+                          alt={selectedOrder.customer_name || "Client"}
                         />
-                        <AvatarFallback>{selectedOrder.customer_name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{selectedOrder.customer_name ? selectedOrder.customer_name.charAt(0) : "C"}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <div>{selectedOrder.customer_name}</div>
-                        <div className="text-xs text-gray-500">{selectedOrder.customer_email}</div>
+                        <div>{selectedOrder.customer_name || "Client"}</div>
+                        <div className="text-xs text-gray-500">{selectedOrder.customer_email || "Email non disponible"}</div>
                       </div>
                     </div>
                   </div>

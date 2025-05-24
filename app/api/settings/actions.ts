@@ -3,10 +3,12 @@
 import { createClient } from "@/utils/supabase/server"
 import type { UserSettings, AppSettings } from "@/types/settings"
 import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
 
 // Récupérer les paramètres utilisateur
 export async function getUserSettings(userId: string): Promise<UserSettings | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { data, error } = await supabase.from("user_settings").select("*").eq("user_id", userId).single()
 
@@ -38,7 +40,8 @@ export async function getUserSettings(userId: string): Promise<UserSettings | nu
 
 // Créer des paramètres utilisateur
 async function createUserSettings(userId: string): Promise<UserSettings | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { data, error } = await supabase
     .from("user_settings")
@@ -82,7 +85,8 @@ export async function updateUserSettings(
   userId: string,
   settings: Partial<UserSettings>,
 ): Promise<UserSettings | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { data, error } = await supabase
     .from("user_settings")
@@ -124,7 +128,8 @@ export async function updateUserSettings(
 
 // Récupérer les paramètres de l'application
 export async function getAppSettings(): Promise<AppSettings | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { data, error } = await supabase
     .from("app_settings")
@@ -157,7 +162,8 @@ export async function getAppSettings(): Promise<AppSettings | null> {
 
 // Mettre à jour les paramètres de l'application
 export async function updateAppSettings(settings: Partial<AppSettings>): Promise<AppSettings | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   // Récupérer l'ID des paramètres actuels
   const { data: currentSettings, error: fetchError } = await supabase

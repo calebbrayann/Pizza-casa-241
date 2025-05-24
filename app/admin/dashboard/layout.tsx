@@ -1,6 +1,7 @@
 import type React from "react"
 import { createClient } from "@/utils/supabase/server"
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 import Navbar from "@/components/navbar"
 import Sidebar from "@/components/sidebar"
 
@@ -9,7 +10,9 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = await createClient()
+
   const {
     data: { session },
   } = await supabase.auth.getSession()

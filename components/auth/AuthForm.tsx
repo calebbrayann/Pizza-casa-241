@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/utils/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { supabase } from '@/utils/supabase/client'
 
 export default function AuthForm({ type }: { type: 'login' | 'register' }) {
   const [email, setEmail] = useState('')
@@ -14,7 +14,7 @@ export default function AuthForm({ type }: { type: 'login' | 'register' }) {
   const [error, setError] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/paiement'
+  const redirectTo = searchParams.get('redirect') || '/'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,23 +29,33 @@ export default function AuthForm({ type }: { type: 'login' | 'register' }) {
           options: {
             data: {
               full_name: fullName,
-              phone
+              phone,
+              role: 'client' // Par défaut, les nouveaux utilisateurs sont des clients
             },
-            emailRedirectTo: `${location.origin}/auth/callback?redirect=${redirectTo}`
+            emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${redirectTo}`
           }
         })
+
         if (error) throw error
+
+        // Rediriger vers la page de vérification
         router.push('/verify-email')
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        })
+
         if (error) throw error
+
+        // Rediriger vers la page demandée ou la page d'accueil
         router.push(redirectTo)
       }
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('An unknown error occurred')
+        setError('Une erreur inconnue est survenue')
       }
     } finally {
       setLoading(false)

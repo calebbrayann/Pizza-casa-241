@@ -1,7 +1,7 @@
 "use client"
 
 import type { User } from "@supabase/supabase-js"
-import { createClient } from "@/utils/supabase/client"
+import { supabase } from "@/utils/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,7 +17,6 @@ import { Bell, Menu, Pizza } from "lucide-react"
 
 export default function Navbar({ user }: { user: User }) {
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

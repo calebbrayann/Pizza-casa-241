@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { User, Address, UserStatus, UserRole } from "@/types/user"
 import { createUser, updateUser } from "@/app/api/users/actions"
 import { X, Plus } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface UserFormProps {
   user?: User
@@ -18,7 +19,9 @@ interface UserFormProps {
 }
 
 export default function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
+  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<Partial<User>>(
     user || {
       name: "",
@@ -63,6 +66,7 @@ export default function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError(null)
 
     try {
       const userData = {
@@ -72,13 +76,27 @@ export default function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
 
       if (user?.id) {
         await updateUser(user.id, userData)
+        toast({
+          title: "Utilisateur mis à jour",
+          description: "Les modifications ont été enregistrées avec succès.",
+        })
       } else {
         await createUser(userData)
+        toast({
+          title: "Utilisateur créé",
+          description: "L'utilisateur a été créé avec succès.",
+        })
       }
 
       if (onSuccess) onSuccess()
     } catch (error) {
       console.error("Erreur lors de la soumission du formulaire:", error)
+      setError(error instanceof Error ? error.message : "Une erreur est survenue lors de la création de l'utilisateur")
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la création de l'utilisateur",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -86,6 +104,11 @@ export default function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -209,13 +232,13 @@ export default function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
         </div>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-4">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Annuler
           </Button>
         )}
-        <Button type="submit" className="bg-[#FFB000] hover:bg-[#FF914D]" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Enregistrement..." : user?.id ? "Mettre à jour" : "Créer"}
         </Button>
       </div>

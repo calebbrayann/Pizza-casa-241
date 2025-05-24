@@ -3,14 +3,14 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/context/auth-context";
 import { useCart } from "@/context/cart-context";
 import { ShoppingCart, Menu, X, User, LogOut, Pizza, Truck, ShieldCheck } from "lucide-react";
 import Image from "next/image";
+import { supabase } from "@/utils/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,23 +24,47 @@ import { CartSidebar } from "@/components/cart-sidebar";
 
 export function MainNav() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { totalItems } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
-    const handleOpenCart = () => {
-      setCartOpen(true);
+    // Vérifier l'état de connexion au chargement
+    const checkUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error('Erreur lors de la vérification de l\'utilisateur:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    document.addEventListener("open-cart", handleOpenCart);
+    checkUser();
+
+    // Écouter les changements d'état d'authentification
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
     return () => {
-      document.removeEventListener("open-cart", handleOpenCart);
+      subscription.unsubscribe();
     };
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    }
+  };
 
   const getNavLinks = () => {
     const commonLinks = [
@@ -49,9 +73,14 @@ export function MainNav() {
       { href: "/support", label: "Support" },
     ];
 
+    if (isLoading) return commonLinks;
+
     if (!user) return commonLinks;
 
-    switch (user.role) {
+    // Récupérer le rôle de l'utilisateur depuis les métadonnées
+    const userRole = user.user_metadata?.role || 'client';
+
+    switch (userRole) {
       case "client":
         return [...commonLinks, { href: "/commandes", label: "Mes Commandes" }];
       case "pizzeria":
@@ -82,7 +111,9 @@ export function MainNav() {
   const getRoleIcon = () => {
     if (!user) return <User className="h-4 w-4 mr-2" />;
 
-    switch (user.role) {
+    const userRole = user.user_metadata?.role || 'client';
+
+    switch (userRole) {
       case "client":
         return <User className="h-4 w-4 mr-2" />;
       case "pizzeria":
@@ -155,7 +186,7 @@ export function MainNav() {
             ))}
           </nav>
 
-          {(!user || user.role !== "pizzeria") && (
+          {(!isLoading && (!user || user.user_metadata?.role !== "pizzeria")) && (
             <form onSubmit={handleSearch} className="hidden md:flex mx-4 flex-1 max-w-xs">
               <div className="relative w-full">
                 <Input
@@ -188,7 +219,7 @@ export function MainNav() {
           )}
 
           <div className="flex items-center space-x-2 ml-auto">
-            {(!user || user.role === "client") && (
+            {(!isLoading && (!user || user.user_metadata?.role === "client")) && (
               <Button variant="outline" size="icon" onClick={toggleCart} className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {totalItems > 0 && (
@@ -210,12 +241,22 @@ export function MainNav() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {user ? (
+                {isLoading ? (
+                  <DropdownMenuItem disabled>
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Chargement...
+                    </span>
+                  </DropdownMenuItem>
+                ) : user ? (
                   <>
                     <DropdownMenuLabel>
                       <div className="flex items-center gap-2">
                         {getRoleIcon()}
-                        <span className="max-w-[150px] truncate">{user.name}</span>
+                        <span className="max-w-[150px] truncate">{user.email}</span>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
@@ -225,7 +266,7 @@ export function MainNav() {
                         Profil
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={logout}>
+                    <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="h-4 w-4 mr-2" />
                       Déconnexion
                     </DropdownMenuItem>

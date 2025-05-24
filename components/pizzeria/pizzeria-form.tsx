@@ -9,15 +9,15 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Pizzeria, PizzeriaStatus } from "@/types/pizzeria"
-import { createPizzeria, updatePizzeria } from "@/app/api/pizzeria/actions"
+import ImageUpload from "@/components/ui/image-upload"
 
 interface PizzeriaFormProps {
   pizzeria?: Pizzeria
-  onSuccess?: () => void
+  onSubmit: (pizzeria: Partial<Pizzeria>) => Promise<void>
   onCancel?: () => void
 }
 
-export default function PizzeriaForm({ pizzeria, onSuccess, onCancel }: PizzeriaFormProps) {
+export default function PizzeriaForm({ pizzeria, onSubmit, onCancel }: PizzeriaFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<Partial<Pizzeria>>(
     pizzeria || {
@@ -46,7 +46,6 @@ export default function PizzeriaForm({ pizzeria, onSuccess, onCancel }: Pizzeria
 
   const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const tagsString = e.target.value
-    // Convertir la chaîne en tableau
     const tagsArray = tagsString.split(",").map((tag) => tag.trim())
     setFormData((prev) => ({ ...prev, tags: tagsArray }))
   }
@@ -60,13 +59,7 @@ export default function PizzeriaForm({ pizzeria, onSuccess, onCancel }: Pizzeria
     setIsSubmitting(true)
 
     try {
-      if (pizzeria?.id) {
-        await updatePizzeria(pizzeria.id, formData)
-      } else {
-        await createPizzeria(formData)
-      }
-
-      if (onSuccess) onSuccess()
+      await onSubmit(formData)
     } catch (error) {
       console.error("Erreur lors de la soumission du formulaire:", error)
     } finally {
@@ -74,101 +67,96 @@ export default function PizzeriaForm({ pizzeria, onSuccess, onCancel }: Pizzeria
     }
   }
 
-  // Convertir le tableau de tags en chaîne pour l'affichage dans le formulaire
   const tagsString = Array.isArray(formData.tags) ? formData.tags.join(", ") : formData.tags
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nom de la pizzeria</Label>
-            <Input
-              id="name"
-              name="name"
-              value={formData.name || ""}
-              onChange={handleChange}
-              placeholder="Nom de la pizzeria"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Téléphone</Label>
-            <Input
-              id="phone"
-              name="phone"
-              value={formData.phone || ""}
-              onChange={handleChange}
-              placeholder="+33 1 23 45 67 89"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="address">Adresse</Label>
+    <form onSubmit={handleSubmit} className="space-y-3 max-w-xl mx-auto">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="name" className="text-sm">Nom</Label>
           <Input
-            id="address"
-            name="address"
-            value={formData.address || ""}
+            id="name"
+            name="name"
+            value={formData.name || ""}
             onChange={handleChange}
-            placeholder="Adresse complète"
+            placeholder="Nom de la pizzeria"
             required
           />
         </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="opening_hours">Heures d'ouverture</Label>
-            <Input
-              id="opening_hours"
-              name="opening_hours"
-              value={formData.opening_hours || ""}
-              onChange={handleChange}
-              placeholder="11:00 - 23:00"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="tags">Tags (séparés par des virgules)</Label>
-            <Input
-              id="tags"
-              name="tags"
-              value={tagsString || ""}
-              onChange={handleTagsChange}
-              placeholder="Italienne, Traditionnelle"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            name="description"
-            value={formData.description || ""}
-            onChange={handleChange}
-            placeholder="Description de la pizzeria"
-            rows={3}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="image">Image (URL)</Label>
+        <div className="space-y-1">
+          <Label htmlFor="phone" className="text-sm">Téléphone</Label>
           <Input
-            id="image"
-            name="image"
-            value={formData.image || ""}
+            id="phone"
+            name="phone"
+            value={formData.phone || ""}
             onChange={handleChange}
-            placeholder="URL de l'image"
+            placeholder="+33 1 23 45 67 89"
           />
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox id="active" checked={formData.status === "active"} onCheckedChange={handleActiveChange} />
-          <Label htmlFor="active">Activer immédiatement</Label>
         </div>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="space-y-1">
+        <Label htmlFor="address" className="text-sm">Adresse</Label>
+        <Input
+          id="address"
+          name="address"
+          value={formData.address || ""}
+          onChange={handleChange}
+          placeholder="Adresse complète"
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="opening_hours" className="text-sm">Horaires</Label>
+          <Input
+            id="opening_hours"
+            name="opening_hours"
+            value={formData.opening_hours || ""}
+            onChange={handleChange}
+            placeholder="11:00 - 23:00"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="tags" className="text-sm">Tags</Label>
+          <Input
+            id="tags"
+            name="tags"
+            value={tagsString || ""}
+            onChange={handleTagsChange}
+            placeholder="Italienne, Traditionnelle"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="description" className="text-sm">Description</Label>
+        <Textarea
+          id="description"
+          name="description"
+          value={formData.description || ""}
+          onChange={handleChange}
+          placeholder="Description de la pizzeria"
+          rows={2}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="image" className="text-sm">Image</Label>
+        <ImageUpload
+          value={formData.image}
+          onChange={(url) => setFormData((prev) => ({ ...prev, image: url }))}
+          folder="pizzerias"
+        />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Checkbox id="active" checked={formData.status === "active"} onCheckedChange={handleActiveChange} />
+        <Label htmlFor="active" className="text-sm">Activer immédiatement</Label>
+      </div>
+
+      <div className="flex justify-end space-x-2 pt-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
             Annuler

@@ -44,8 +44,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: <Store className="h-5 w-5" />,
     },
     {
-      title: "PIZZAS",
-      href: "/admin/Pizzas",
+      title: "Pizzas",
+      href: "/admin/pizzas",
       icon: <Pizza className="h-5 w-5" />,
     },
     {

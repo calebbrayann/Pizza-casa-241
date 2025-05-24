@@ -7,133 +7,87 @@ import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 
 // Récupérer toutes les commandes avec filtrage
-export async function getOrders(filter?: OrderFilter): Promise<Order[]> {
-  const supabase = createClient()
+export async function getOrders(filters?: {
+  status?: OrderStatus
+  startDate?: string
+  endDate?: string
+  pizzeriaId?: string
+}): Promise<Order[]> {
+  try {
+    const supabase = await createClient()
 
-  // Construire la requête de base
-  let query = supabase.from("orders").select(
-    `
-      *,
-      users!orders_customer_id_fkey (
-        name,
-        email,
-        avatar_url
-      ),
-      pizzerias!orders_pizzeria_id_fkey (
-        name
-      )
-    `,
-  )
+    let query = supabase.from("orders_with_details").select("*")
 
-  // Appliquer les filtres
-  if (filter) {
-    if (filter.status) {
-      query = query.eq("status", filter.status)
+    if (filters?.status) {
+      query = query.eq("status", filters.status)
     }
 
-    if (filter.search) {
-      query = query.or(`id.ilike.%${filter.search}%`)
+    if (filters?.startDate) {
+      query = query.gte("order_date", filters.startDate)
     }
 
-    // Filtrage par période
-    if (filter.period) {
-      const today = new Date()
-      let startDate: Date
-      let endDate = new Date()
-
-      switch (filter.period) {
-        case "today":
-          startDate = today
-          break
-        case "yesterday":
-          startDate = new Date(today)
-          startDate.setDate(today.getDate() - 1)
-          endDate = new Date(startDate)
-          break
-        case "week":
-          startDate = new Date(today)
-          startDate.setDate(today.getDate() - 7)
-          break
-        case "month":
-          startDate = new Date(today)
-          startDate.setMonth(today.getMonth() - 1)
-          break
-        case "custom":
-          if (filter.startDate) {
-            startDate = new Date(filter.startDate)
-            if (filter.endDate) {
-              endDate = new Date(filter.endDate)
-            }
-          } else {
-            startDate = new Date(0) // Si pas de date de début spécifiée, prendre depuis le début
-          }
-          break
-        default:
-          startDate = new Date(0)
-      }
-
-      query = query
-        .gte("order_date", startDate.toISOString().split("T")[0])
-        .lte("order_date", endDate.toISOString().split("T")[0])
+    if (filters?.endDate) {
+      query = query.lte("order_date", filters.endDate)
     }
+
+    if (filters?.pizzeriaId) {
+      query = query.eq("pizzeria_id", filters.pizzeriaId)
+    }
+
+    const { data: ordersData, error: ordersError } = await query
+
+    if (ordersError) {
+      console.error("Error fetching orders:", ordersError)
+      throw new Error("Failed to fetch orders")
+    }
+
+    // Récupérer les items pour chaque commande
+    const ordersWithItems = await Promise.all(
+      ordersData.map(async (orderData) => {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from("order_items")
+          .select("*")
+          .eq("order_id", orderData.id)
+
+        if (itemsError) {
+          console.error("Error fetching order items:", itemsError)
+          throw new Error("Failed to fetch order items")
+        }
+
+        return {
+          id: orderData.id,
+          customer_id: orderData.customer_id,
+          customer_name: orderData.customer_name,
+          customer_email: orderData.customer_email,
+          customer_avatar: orderData.customer_avatar,
+          pizzeria_id: orderData.pizzeria_id,
+          pizzeria_name: orderData.pizzeria_name,
+          total: orderData.total,
+          status: orderData.status,
+          date: orderData.order_date,
+          time: orderData.order_time,
+          delivery_fee: orderData.delivery_fee,
+          payment_method: orderData.payment_method,
+          items: itemsData.map((item) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+        }
+      })
+    )
+
+    return ordersWithItems
+  } catch (error) {
+    console.error("Error in getOrders:", error)
+    throw new Error("Erreur lors de la récupération des commandes")
   }
-
-  // Exécuter la requête
-  const { data: ordersData, error } = await query.order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Erreur lors de la récupération des commandes:", error)
-    throw new Error("Impossible de récupérer les commandes")
-  }
-
-  // Récupérer les articles pour chaque commande
-  const orders: Order[] = []
-
-  for (const orderData of ordersData) {
-    const { data: orderItems, error: itemsError } = await supabase
-      .from("order_items")
-      .select("*")
-      .eq("order_id", orderData.id)
-
-    if (itemsError) {
-      console.error("Erreur lors de la récupération des articles de commande:", itemsError)
-      continue
-    }
-
-    // Formater la date pour l'affichage
-    const orderDate = new Date(orderData.order_date)
-    const formattedDate = format(orderDate, "dd/MM/yyyy", { locale: fr })
-
-    // Formater l'heure pour l'affichage
-    const timeParts = orderData.order_time.split(":")
-    const formattedTime = `${timeParts[0]}:${timeParts[1]}`
-
-    orders.push({
-      id: orderData.id,
-      customer_id: orderData.customer_id,
-      customer_name: orderData.users.name,
-      customer_email: orderData.users.email,
-      customer_avatar: orderData.users.avatar_url,
-      pizzeria_id: orderData.pizzeria_id,
-      pizzeria_name: orderData.pizzerias.name,
-      total: orderData.total,
-      status: orderData.status,
-      date: formattedDate,
-      time: formattedTime,
-      items: orderItems as OrderItem[],
-      delivery_fee: orderData.delivery_fee,
-      payment_method: orderData.payment_method,
-      created_at: orderData.created_at,
-      updated_at: orderData.updated_at,
-    })
-  }
-
-  return orders
 }
 
 // Récupérer une commande par ID
 export async function getOrderById(id: string): Promise<Order | null> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: orderData, error } = await supabase
     .from("orders")
@@ -205,7 +159,7 @@ export async function createOrder(orderData: {
   delivery_fee?: number
   payment_method?: string
 }): Promise<Order | null> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Calculer le total de la commande
   const itemsTotal = orderData.items.reduce((total, item) => total + item.price * item.quantity, 0)
@@ -257,7 +211,7 @@ export async function createOrder(orderData: {
 
 // Mettre à jour le statut d'une commande
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<Order | null> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { error } = await supabase
     .from("orders")
@@ -280,7 +234,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
 
 // Supprimer une commande
 export async function deleteOrder(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Supprimer d'abord les articles de la commande (contrainte de clé étrangère)
   const { error: itemsError } = await supabase.from("order_items").delete().eq("order_id", id)
@@ -302,7 +256,7 @@ export async function deleteOrder(id: string): Promise<void> {
 
 // Obtenir des statistiques sur les commandes
 export async function getOrderStats() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Nombre total de commandes
   const { count: totalOrders, error: countError } = await supabase.from("orders").select("*", { count: "exact" })

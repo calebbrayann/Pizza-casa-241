@@ -14,10 +14,12 @@ import type {
 import { revalidatePath } from "next/cache"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
+import { cookies } from "next/headers"
 
 // Récupérer tous les tickets avec filtrage
 export async function getTickets(filter?: TicketFilter): Promise<SupportTicket[]> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   // Construire la requête de base
   let query = supabase.from("support_tickets").select(
@@ -111,7 +113,8 @@ export async function getTickets(filter?: TicketFilter): Promise<SupportTicket[]
 
 // Récupérer un ticket par ID
 export async function getTicketById(id: string): Promise<SupportTicket | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { data: ticketData, error } = await supabase
     .from("support_tickets")
@@ -185,14 +188,9 @@ export async function getTicketById(id: string): Promise<SupportTicket | null> {
 }
 
 // Créer un nouveau ticket
-export async function createTicket(ticketData: {
-  subject: string
-  customer_id: string
-  priority?: TicketPriority
-  category?: TicketCategory
-  message: string
-}): Promise<SupportTicket | null> {
-  const supabase = createClient()
+export async function createTicket(ticketData: Partial<SupportTicket>): Promise<SupportTicket | null> {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   // Insérer le ticket
   const { data: newTicket, error } = await supabase
@@ -236,14 +234,18 @@ export async function createTicket(ticketData: {
 }
 
 // Ajouter un message à un ticket
-export async function addTicketMessage(ticketId: string, content: string, sender: "customer" | "agent"): Promise<void> {
-  const supabase = createClient()
+export async function addTicketMessage(
+  ticketId: string,
+  messageData: Partial<TicketMessage>,
+): Promise<TicketMessage | null> {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { error } = await supabase.from("ticket_messages").insert([
     {
       ticket_id: ticketId,
-      sender,
-      content,
+      sender: messageData.sender,
+      content: messageData.content,
     },
   ])
 
@@ -261,11 +263,35 @@ export async function addTicketMessage(ticketId: string, content: string, sender
     .eq("id", ticketId)
 
   revalidatePath("/support")
+
+  // Récupérer le message ajouté
+  const { data: addedMessage, error: messageError } = await supabase
+    .from("ticket_messages")
+    .select("*")
+    .eq("ticket_id", ticketId)
+    .order("created_at", { ascending: true })
+    .single()
+
+  if (messageError) {
+    console.error("Erreur lors de la récupération du message ajouté:", messageError)
+    return null
+  }
+
+  return {
+    id: addedMessage.id,
+    ticket_id: addedMessage.ticket_id,
+    sender: addedMessage.sender,
+    content: addedMessage.content,
+    timestamp: addedMessage.created_at,
+    created_at: addedMessage.created_at,
+    updated_at: addedMessage.updated_at,
+  }
 }
 
 // Mettre à jour le statut d'un ticket
-export async function updateTicketStatus(id: string, status: TicketStatus): Promise<SupportTicket | null> {
-  const supabase = createClient()
+export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { error } = await supabase
     .from("support_tickets")
@@ -281,14 +307,12 @@ export async function updateTicketStatus(id: string, status: TicketStatus): Prom
   }
 
   revalidatePath("/support")
-
-  // Récupérer le ticket mis à jour
-  return await getTicketById(id)
 }
 
 // Mettre à jour la priorité d'un ticket
-export async function updateTicketPriority(id: string, priority: TicketPriority): Promise<SupportTicket | null> {
-  const supabase = createClient()
+export async function updateTicketPriority(id: string, priority: TicketPriority): Promise<void> {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { error } = await supabase
     .from("support_tickets")
@@ -304,14 +328,12 @@ export async function updateTicketPriority(id: string, priority: TicketPriority)
   }
 
   revalidatePath("/support")
-
-  // Récupérer le ticket mis à jour
-  return await getTicketById(id)
 }
 
 // Récupérer toutes les FAQ avec filtrage
 export async function getFaqItems(filter?: FaqFilter): Promise<FaqItem[]> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   // Construire la requête de base
   let query = supabase.from("faq_items").select("*")
@@ -351,13 +373,9 @@ export async function getFaqItems(filter?: FaqFilter): Promise<FaqItem[]> {
 }
 
 // Créer une nouvelle FAQ
-export async function createFaqItem(faqData: {
-  question: string
-  answer: string
-  category: TicketCategory
-  is_published: boolean
-}): Promise<FaqItem | null> {
-  const supabase = createClient()
+export async function createFaqItem(faqData: Partial<FaqItem>): Promise<FaqItem | null> {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { data, error } = await supabase
     .from("faq_items")
@@ -391,16 +409,9 @@ export async function createFaqItem(faqData: {
 }
 
 // Mettre à jour une FAQ
-export async function updateFaqItem(
-  id: string,
-  faqData: {
-    question?: string
-    answer?: string
-    category?: TicketCategory
-    is_published?: boolean
-  },
-): Promise<FaqItem | null> {
-  const supabase = createClient()
+export async function updateFaqItem(id: string, faqData: Partial<FaqItem>): Promise<FaqItem | null> {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { data, error } = await supabase
     .from("faq_items")
@@ -435,7 +446,8 @@ export async function updateFaqItem(
 
 // Supprimer une FAQ
 export async function deleteFaqItem(id: string): Promise<void> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   const { error } = await supabase.from("faq_items").delete().eq("id", id)
 

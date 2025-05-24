@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/utils/supabase/server"
+import { cookies } from "next/headers"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Pizza, ShoppingBag, Users, Star } from "lucide-react"
 import Link from "next/link"
 
 export default async function Home() {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
   const {
     data: { session },
   } = await supabase.auth.getSession()

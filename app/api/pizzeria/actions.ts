@@ -3,12 +3,20 @@
 import { createClient } from "@/utils/supabase/server"
 import type { Pizzeria, PizzeriaFilter, PizzeriaStatus } from "@/types/pizzeria"
 import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
 
 // Récupérer toutes les pizzerias avec filtrage
 export async function getPizzerias(filter?: PizzeriaFilter): Promise<Pizzeria[]> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
-  let query = supabase.from("pizzerias").select("*")
+  // Utiliser une sous-requête pour compter les commandes
+  let query = supabase
+    .from("pizzerias")
+    .select(`
+      *,
+      orders_count:orders(count)
+    `)
+    .order("name")
 
   // Appliquer les filtres
   if (filter) {
@@ -21,35 +29,43 @@ export async function getPizzerias(filter?: PizzeriaFilter): Promise<Pizzeria[]>
     }
   }
 
-  const { data, error } = await query.order("name")
+  const { data, error } = await query
 
   if (error) {
     console.error("Erreur lors de la récupération des pizzerias:", error)
     throw new Error("Impossible de récupérer les pizzerias")
   }
 
-  // Formater les données pour correspondre à notre type Pizzeria
-  return data.map((pizzeria) => ({
-    id: pizzeria.id,
-    name: pizzeria.name,
-    image: pizzeria.image || "/placeholder.svg?height=200&width=300",
-    rating: pizzeria.rating,
-    address: pizzeria.address,
-    phone: pizzeria.phone,
-    opening_hours: pizzeria.opening_hours,
-    tags: pizzeria.tags || [],
-    status: pizzeria.status,
-    orders_count: pizzeria.orders_count || 0,
-    revenue: pizzeria.revenue || 0,
-    description: pizzeria.description,
-    created_at: pizzeria.created_at,
-    updated_at: pizzeria.updated_at,
-  }))
+  // Dédupliquer les pizzerias en utilisant un Map
+  const uniquePizzerias = new Map()
+  data.forEach((pizzeria) => {
+    if (!uniquePizzerias.has(pizzeria.id)) {
+      uniquePizzerias.set(pizzeria.id, {
+        id: pizzeria.id,
+        name: pizzeria.name,
+        image: pizzeria.image || "/placeholder.svg?height=200&width=300",
+        rating: pizzeria.rating,
+        address: pizzeria.address,
+        phone: pizzeria.phone,
+        opening_hours: pizzeria.opening_hours,
+        tags: pizzeria.tags || [],
+        status: pizzeria.status,
+        orders_count: pizzeria.orders_count?.[0]?.count || 0,
+        revenue: pizzeria.revenue || 0,
+        description: pizzeria.description,
+        created_at: pizzeria.created_at,
+        updated_at: pizzeria.updated_at,
+      })
+    }
+  })
+
+  return Array.from(uniquePizzerias.values())
 }
 
 // Récupérer une pizzeria par ID
 export async function getPizzeriaById(id: string): Promise<Pizzeria | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = await createClient(cookieStore)
 
   const { data, error } = await supabase.from("pizzerias").select("*").eq("id", id).single()
 
@@ -80,48 +96,68 @@ export async function getPizzeriaById(id: string): Promise<Pizzeria | null> {
 
 // Créer une nouvelle pizzeria
 export async function createPizzeria(pizzeriaData: Partial<Pizzeria>): Promise<Pizzeria | null> {
-  const supabase = createClient()
+  try {
+    const supabase = await createClient()
 
-  // Préparer les tags si c'est une chaîne de caractères
-  let tags = pizzeriaData.tags
-  if (typeof pizzeriaData.tags === "string") {
-    tags = (pizzeriaData.tags as string).split(",").map((tag) => tag.trim())
+    // Préparer les tags si c'est une chaîne de caractères
+    let tags = pizzeriaData.tags
+    if (typeof pizzeriaData.tags === "string") {
+      tags = (pizzeriaData.tags as string).split(",").map((tag) => tag.trim())
+    }
+
+    // Préparer les données pour l'insertion
+    const newPizzeriaData = {
+      name: pizzeriaData.name,
+      image: pizzeriaData.image || "/placeholder.svg?height=200&width=300",
+      rating: pizzeriaData.rating || 0,
+      address: pizzeriaData.address,
+      phone: pizzeriaData.phone,
+      opening_hours: pizzeriaData.opening_hours,
+      tags: tags,
+      status: pizzeriaData.status || "active",
+      orders_count: 0,
+      revenue: 0,
+      description: pizzeriaData.description,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    console.log("Données de la pizzeria à créer:", newPizzeriaData)
+
+    // Insérer la pizzeria
+    const { data: newPizzeria, error } = await supabase
+      .from("pizzerias")
+      .insert([newPizzeriaData])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Erreur lors de la création de la pizzeria:", error)
+      throw new Error(`Impossible de créer la pizzeria: ${error.message}`)
+    }
+
+    console.log("Pizzeria créée avec succès:", newPizzeria)
+
+    // Revalider le chemin pour mettre à jour l'interface
+    revalidatePath("/admin/pizzerias")
+
+    // Récupérer la pizzeria créée pour s'assurer que tout est correct
+    const createdPizzeria = await getPizzeriaById(newPizzeria.id)
+    if (!createdPizzeria) {
+      throw new Error("La pizzeria a été créée mais n'a pas pu être récupérée")
+    }
+
+    return createdPizzeria
+  } catch (error) {
+    console.error("Erreur complète lors de la création de la pizzeria:", error)
+    throw error
   }
-
-  // Insérer la pizzeria
-  const { data: newPizzeria, error } = await supabase
-    .from("pizzerias")
-    .insert([
-      {
-        name: pizzeriaData.name,
-        image: pizzeriaData.image || "/placeholder.svg?height=200&width=300",
-        rating: pizzeriaData.rating || 0,
-        address: pizzeriaData.address,
-        phone: pizzeriaData.phone,
-        opening_hours: pizzeriaData.opening_hours,
-        tags: tags,
-        status: pizzeriaData.status || "active",
-        orders_count: pizzeriaData.orders_count || 0,
-        revenue: pizzeriaData.revenue || 0,
-        description: pizzeriaData.description,
-      },
-    ])
-    .select()
-    .single()
-
-  if (error) {
-    console.error("Erreur lors de la création de la pizzeria:", error)
-    throw new Error("Impossible de créer la pizzeria")
-  }
-
-  revalidatePath("/pizzerias")
-
-  return await getPizzeriaById(newPizzeria.id)
 }
 
 // Mettre à jour une pizzeria existante
 export async function updatePizzeria(id: string, pizzeriaData: Partial<Pizzeria>): Promise<Pizzeria | null> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = await createClient(cookieStore)
 
   // Préparer les tags si c'est une chaîne de caractères
   let tags = pizzeriaData.tags
@@ -161,7 +197,8 @@ export async function updatePizzeria(id: string, pizzeriaData: Partial<Pizzeria>
 
 // Changer le statut d'une pizzeria (activer/désactiver)
 export async function updatePizzeriaStatus(id: string, status: PizzeriaStatus): Promise<void> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = await createClient(cookieStore)
 
   const { error } = await supabase
     .from("pizzerias")
@@ -181,7 +218,8 @@ export async function updatePizzeriaStatus(id: string, status: PizzeriaStatus): 
 
 // Supprimer une pizzeria
 export async function deletePizzeria(id: string): Promise<void> {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = await createClient(cookieStore)
 
   const { error } = await supabase.from("pizzerias").delete().eq("id", id)
 

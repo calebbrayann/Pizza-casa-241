@@ -2,20 +2,14 @@ import { Suspense } from "react"
 import { getUserSettings, getAppSettings } from "@/app/api/settings/actions"
 import { getUserById } from "@/app/api/users/actions"
 import { createClient } from "@/utils/supabase/server"
+import { cookies } from "next/headers"
 import ParametresClient from "./parametres-client"
 
 export const dynamic = "force-dynamic"
 
 export default async function ParametresPage() {
-  return (
-    <Suspense fallback={<div className="p-8">Chargement des paramètres...</div>}>
-      <ParametresContent />
-    </Suspense>
-  )
-}
-
-async function ParametresContent() {
-  const supabase = createClient()
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
 
   // Récupérer l'utilisateur connecté
   const {

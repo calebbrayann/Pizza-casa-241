@@ -4,13 +4,16 @@ import { createClient } from "@/utils/supabase/server"
 import type { DashboardStats } from "@/types/dashboard"
 import type { OrderStatus } from "@/types/order"
 import type { TicketStatus } from "@/types/support"
+import { cookies } from "next/headers"
 
 // Récupérer les statistiques pour le tableau de bord
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Nombre total d'utilisateurs
-  const { count: totalUsers, error: usersError } = await supabase.from("users").select("*", { count: "exact" })
+  const { count: totalUsers, error: usersError } = await supabase
+    .from("users")
+    .select("*", { count: "exact", head: true })
 
   if (usersError) {
     console.error("Erreur lors du comptage des utilisateurs:", usersError)
@@ -20,7 +23,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   // Nombre total de pizzerias
   const { count: totalPizzerias, error: pizzeriasError } = await supabase
     .from("pizzerias")
-    .select("*", { count: "exact" })
+    .select("*", { count: "exact", head: true })
 
   if (pizzeriasError) {
     console.error("Erreur lors du comptage des pizzerias:", pizzeriasError)
@@ -28,7 +31,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 
   // Nombre total de commandes
-  const { count: totalOrders, error: ordersError } = await supabase.from("orders").select("*", { count: "exact" })
+  const { count: totalOrders, error: ordersError } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
 
   if (ordersError) {
     console.error("Erreur lors du comptage des commandes:", ordersError)
@@ -36,7 +41,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 
   // Chiffre d'affaires total
-  const { data: revenueData, error: revenueError } = await supabase.from("orders").select("total")
+  const { data: revenueData, error: revenueError } = await supabase
+    .from("orders")
+    .select("total")
 
   if (revenueError) {
     console.error("Erreur lors du calcul du chiffre d'affaires:", revenueError)
@@ -46,7 +53,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const totalRevenue = revenueData.reduce((sum, order) => sum + order.total, 0)
 
   // Nombre de commandes par statut
-  const { data: orderStatusData, error: orderStatusError } = await supabase.from("orders").select("status")
+  const { data: orderStatusData, error: orderStatusError } = await supabase
+    .from("orders")
+    .select("status")
 
   if (orderStatusError) {
     console.error("Erreur lors du comptage des statuts de commande:", orderStatusError)
@@ -66,7 +75,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   })
 
   // Nombre de tickets par statut
-  const { data: ticketStatusData, error: ticketStatusError } = await supabase.from("support_tickets").select("status")
+  const { data: ticketStatusData, error: ticketStatusError } = await supabase
+    .from("support_tickets")
+    .select("status")
 
   if (ticketStatusError) {
     console.error("Erreur lors du comptage des statuts de ticket:", ticketStatusError)
@@ -127,7 +138,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 
   // Top pizzerias par nombre de commandes
-  const { data: topPizzeriasData, error: topPizzeriasError } = await supabase.rpc("get_top_pizzerias", { limit_num: 5 })
+  const { data: topPizzeriasData, error: topPizzeriasError } = await supabase
+    .rpc("get_top_pizzerias", { limit_num: 5 })
 
   if (topPizzeriasError) {
     console.error("Erreur lors de la récupération des top pizzerias:", topPizzeriasError)
