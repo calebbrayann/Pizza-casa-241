@@ -26,7 +26,7 @@ export default async function Home() {
           <nav className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
               <Pizza className="h-8 w-8" />
-              <span className="text-2xl font-bold">Admin PizzaCasa</span>
+              <span className="text-2xl font-bold">Dhenne Administrateur</span>
             </div>
             <div className="hidden md:flex space-x-6">
               <a href="#features" className="hover:text-[#FFB000] transition-colors">
@@ -79,7 +79,7 @@ export default async function Home() {
             </div>
             <div className="md:w-1/2">
               <img
-                src="/placeholder.svg?height=400&width=600"
+                src="/staff.avif"
                 alt="Dashboard Preview"
                 className="rounded-lg shadow-2xl"
               />
@@ -200,7 +200,7 @@ export default async function Home() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Pizza className="h-6 w-6" />
-                <span className="text-xl font-bold">Admin PizzaCasa </span>
+                <span className="text-xl font-bold">Dhenne Administrateur </span>
               </div>
               <p className="text-gray-400">La solution complète pour la gestion de votre réseau de pizzerias.</p>
             </div>

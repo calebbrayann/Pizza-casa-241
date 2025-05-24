@@ -36,7 +36,7 @@ export default function Navbar({ user }: { user: User }) {
         </div>
         <div className="hidden items-center gap-2 md:flex">
           <Pizza className="h-6 w-6 text-[#9B1B1B]" />
-          <span className="text-xl font-bold">Admin PizzaCasa</span>
+          <span className="text-xl font-bold"></span>
         </div>
         <div className="ml-auto flex items-center gap-4">
           <Button variant="ghost" size="icon" className="relative">
