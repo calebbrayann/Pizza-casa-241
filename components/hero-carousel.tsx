@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 // Images du carrousel
 const carouselImages = [
   {
-    src: "/hero/hero1.png",
+    src: "/hero/carrou.avif",
     alt: "Pizza délicieuse",
     title: "Découvrez les meilleures pizzerias près de chez vous",
     description: "Commandez facilement vos pizzas préférées en quelques clics et profitez d'une livraison rapide.",
@@ -22,7 +22,7 @@ const carouselImages = [
       "Nos pizzaiolos sélectionnent les meilleurs ingrédients pour vous offrir une expérience gustative unique.",
   },
   {
-    src: "/hero/hero3.png",
+    src: "/hero/livreur.avif",
     alt: "Livraison rapide",
     title: "Livraison rapide à domicile",
     description: "Recevez votre commande en moins de 45 minutes, chaude et savoureuse.",

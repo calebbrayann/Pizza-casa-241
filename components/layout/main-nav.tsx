@@ -163,7 +163,7 @@ export function MainNav() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2">
               <div className="relative h-16 w-16 md:h-20 md:w-20">
-                <Image src="/sep13.png" alt="Pizza Casa Logo" fill className="object-contain" />
+                <Image src="/log.png" alt="Pizza Casa Logo" fill className="object-contain" />
               </div>
               <span className="text-2xl font-bold text-[#9B1B1B] font-montserrat">Pizza Casa</span>
             </Link>

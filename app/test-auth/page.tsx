@@ -41,18 +41,42 @@ export default function TestAuth() {
       // Récupérer le profil de l'utilisateur
       console.log('Récupération du profil...')
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
         .eq('id', session.user.id)
         .single()
 
       if (profileError) {
-        console.error('Erreur de profil:', profileError)
-        throw profileError
-      }
+        console.log('Profil non trouvé, création du profil...')
+        // Extraire le nom de l'email (partie avant @)
+        const name = session.user.email.split('@')[0]
+        
+        // Créer le profil utilisateur s'il n'existe pas
+        const { data: newProfile, error: createError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: session.user.id,
+              email: session.user.email,
+              name: name,
+              role: 'user',
+              created_at: new Date().toISOString()
+            }
+          ])
+          .select()
+          .single()
 
-      console.log('Profil trouvé:', profileData)
-      setProfile(profileData)
+        if (createError) {
+          console.error('Erreur lors de la création du profil:', createError)
+          throw createError
+        }
+
+        console.log('Nouveau profil créé:', newProfile)
+        setProfile(newProfile)
+      } else {
+        console.log('Profil trouvé:', profileData)
+        setProfile(profileData)
+      }
     } catch (error) {
       console.error('Erreur détaillée:', error)
       setError(error.message || 'Une erreur est survenue')

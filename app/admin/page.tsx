@@ -200,7 +200,7 @@ export default async function Home() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Pizza className="h-6 w-6" />
-                <span className="text-xl font-bold">Dhenne Administrateur </span>
+                <span className="text-xl font-bold">Dhenne Administrateur</span>
               </div>
               <p className="text-gray-400">La solution complète pour la gestion de votre réseau de pizzerias.</p>
             </div>
