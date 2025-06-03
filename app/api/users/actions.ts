@@ -10,65 +10,93 @@ import { v4 as uuidv4 } from 'uuid'
 export async function getUsers(filter?: UserFilter): Promise<User[]> {
   try {
     const supabase = await createClient()
+    console.log("Début de la récupération des utilisateurs")
 
-    // Récupérer les utilisateurs avec leurs adresses et commandes
-    let query = supabase
+    // Récupérer les utilisateurs depuis la table profiles
+    const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select(`
-        *,
-        orders (
-          id,
-          total
-        )
-      `)
+      .select("*")
 
-    // Appliquer les filtres
-    if (filter) {
-      if (filter.status) {
-        query = query.eq("status", filter.status)
-      }
-
-      if (filter.role) {
-        query = query.eq("role", filter.role)
-      }
-
-      if (filter.search) {
-        query = query.or(`full_name.ilike.%${filter.search}%,email.ilike.%${filter.search}%`)
-      }
+    if (profilesError) {
+      console.error("Erreur lors de la récupération des profils:", JSON.stringify(profilesError, null, 2))
+      throw profilesError
     }
 
-    const { data, error } = await query
-
-    if (error) {
-      console.error("Erreur lors de la récupération des utilisateurs:", error)
-      throw error
-    }
-
-    if (!data) {
+    if (!profiles) {
       return []
     }
 
+    console.log("Premier profil récupéré:", JSON.stringify(profiles[0], null, 2))
+
+    // Filtrer les utilisateurs si nécessaire
+    let filteredProfiles = profiles
+    if (filter) {
+      filteredProfiles = profiles.filter(profile => {
+        let matches = true
+
+        if (filter.status) {
+          matches = matches && profile.status === filter.status
+        }
+
+        if (filter.role) {
+          matches = matches && profile.role === filter.role
+        }
+
+        if (filter.search) {
+          const searchLower = filter.search.toLowerCase()
+          const fullName = (profile.full_name || "").toLowerCase()
+          const email = (profile.email || "").toLowerCase()
+          matches = matches && (fullName.includes(searchLower) || email.includes(searchLower))
+        }
+
+        return matches
+      })
+    }
+
+    // Récupérer les commandes pour tous les utilisateurs
+    const userIds = filteredProfiles.map(profile => profile.id)
+    const { data: ordersData, error: ordersError } = await supabase
+      .from("orders")
+      .select("id, total, customer_id")
+      .in("customer_id", userIds)
+
+    if (ordersError) {
+      console.error("Erreur lors de la récupération des commandes:", JSON.stringify(ordersError, null, 2))
+      throw ordersError
+    }
+
+    // Créer un map des commandes par utilisateur
+    const ordersByUser = new Map<string, Array<{ id: string; total: number }>>()
+    ordersData?.forEach(order => {
+      if (!ordersByUser.has(order.customer_id)) {
+        ordersByUser.set(order.customer_id, [])
+      }
+      ordersByUser.get(order.customer_id)?.push({
+        id: order.id,
+        total: order.total
+      })
+    })
+
     // Formater les données pour correspondre à notre type User
-    return data.map((user) => {
-      // Calculer le nombre de commandes et le total dépensé
-      const orders = user.orders || []
-      const ordersCount = orders.length
-      const totalSpent = orders.reduce((total, order) => total + (order.total || 0), 0)
+    return filteredProfiles.map((profile) => {
+      const userOrders = ordersByUser.get(profile.id) || []
+      const ordersCount = userOrders.length
+      const totalSpent = userOrders.reduce((total, order) => total + (order.total || 0), 0)
 
       return {
-        id: user.id,
-        name: user.full_name || "Utilisateur sans nom",
-        email: user.email || "Email inconnu",
-        avatar_url: user.avatar_url || null,
-        status: user.status || "active",
-        role: user.role || "user",
-        registered_date: new Date(user.created_at).toLocaleDateString("fr-FR"),
+        id: profile.id,
+        name: profile.full_name || "Utilisateur sans nom",
+        email: profile.email || "Email inconnu",
+        avatar_url: profile.avatar_url || null,
+        status: profile.status || "active",
+        role: profile.role || "user",
+        registered_date: new Date(profile.created_at).toLocaleDateString("fr-FR"),
         orders_count: ordersCount,
         total_spent: totalSpent,
-        last_login: user.last_sign_in_at ? formatLastLogin(new Date(user.last_sign_in_at)) : "Jamais",
-        addresses: user.addresses || [],
-        created_at: user.created_at,
-        updated_at: user.updated_at,
+        last_login: profile.last_sign_in_at ? formatLastLogin(new Date(profile.last_sign_in_at)) : "Jamais",
+        addresses: profile.addresses || [],
+        created_at: profile.created_at,
+        updated_at: profile.updated_at,
       }
     })
   } catch (error) {
