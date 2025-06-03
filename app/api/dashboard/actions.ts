@@ -10,173 +10,86 @@ import { cookies } from "next/headers"
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient()
 
-  // Nombre total d'utilisateurs
-  const { count: totalUsers, error: usersError } = await supabase
-    .from("users")
-    .select("*", { count: "exact", head: true })
+  try {
+    console.log("Début de getDashboardStats")
 
-  if (usersError) {
-    console.error("Erreur lors du comptage des utilisateurs:", usersError)
-    throw new Error("Impossible de compter les utilisateurs")
-  }
-
-  // Nombre total de pizzerias
-  const { count: totalPizzerias, error: pizzeriasError } = await supabase
-    .from("pizzerias")
-    .select("*", { count: "exact", head: true })
-
-  if (pizzeriasError) {
-    console.error("Erreur lors du comptage des pizzerias:", pizzeriasError)
-    throw new Error("Impossible de compter les pizzerias")
-  }
-
-  // Nombre total de commandes
-  const { count: totalOrders, error: ordersError } = await supabase
-    .from("orders")
-    .select("*", { count: "exact", head: true })
-
-  if (ordersError) {
-    console.error("Erreur lors du comptage des commandes:", ordersError)
-    throw new Error("Impossible de compter les commandes")
-  }
-
-  // Chiffre d'affaires total
-  const { data: revenueData, error: revenueError } = await supabase
-    .from("orders")
-    .select("total")
-
-  if (revenueError) {
-    console.error("Erreur lors du calcul du chiffre d'affaires:", revenueError)
-    throw new Error("Impossible de calculer le chiffre d'affaires")
-  }
-
-  const totalRevenue = revenueData.reduce((sum, order) => sum + order.total, 0)
-
-  // Nombre de commandes par statut
-  const { data: orderStatusData, error: orderStatusError } = await supabase
-    .from("orders")
-    .select("status")
-
-  if (orderStatusError) {
-    console.error("Erreur lors du comptage des statuts de commande:", orderStatusError)
-    throw new Error("Impossible de compter les statuts de commande")
-  }
-
-  const ordersByStatus = {
-    confirmed: 0,
-    preparing: 0,
-    delivering: 0,
-    delivered: 0,
-    cancelled: 0,
-  }
-
-  orderStatusData.forEach((order) => {
-    ordersByStatus[order.status as OrderStatus]++
-  })
-
-  // Nombre de tickets par statut
-  const { data: ticketStatusData, error: ticketStatusError } = await supabase
-    .from("support_tickets")
-    .select("status")
-
-  if (ticketStatusError) {
-    console.error("Erreur lors du comptage des statuts de ticket:", ticketStatusError)
-    throw new Error("Impossible de compter les statuts de ticket")
-  }
-
-  const ticketsByStatus = {
-    open: 0,
-    pending: 0,
-    closed: 0,
-  }
-
-  ticketStatusData.forEach((ticket) => {
-    ticketsByStatus[ticket.status as TicketStatus]++
-  })
-
-  // Commandes récentes
-  const { data: recentOrdersData, error: recentOrdersError } = await supabase
-    .from("orders")
-    .select(
-      `
-      *,
-      users!orders_customer_id_fkey (
-        name,
-        email
-      ),
-      pizzerias!orders_pizzeria_id_fkey (
-        name
-      )
-    `,
-    )
-    .order("created_at", { ascending: false })
-    .limit(5)
-
-  if (recentOrdersError) {
-    console.error("Erreur lors de la récupération des commandes récentes:", recentOrdersError)
-    throw new Error("Impossible de récupérer les commandes récentes")
-  }
-
-  // Tickets récents
-  const { data: recentTicketsData, error: recentTicketsError } = await supabase
-    .from("support_tickets")
-    .select(
-      `
-      *,
-      users!support_tickets_customer_id_fkey (
-        name,
-        email
-      )
-    `,
-    )
-    .order("created_at", { ascending: false })
-    .limit(5)
-
-  if (recentTicketsError) {
-    console.error("Erreur lors de la récupération des tickets récents:", recentTicketsError)
-    throw new Error("Impossible de récupérer les tickets récents")
-  }
-
-  // Top pizzerias par nombre de commandes
-  const { data: topPizzeriasData, error: topPizzeriasError } = await supabase
-    .rpc("get_top_pizzerias", { limit_num: 5 })
-
-  if (topPizzeriasError) {
-    console.error("Erreur lors de la récupération des top pizzerias:", topPizzeriasError)
-    // Fallback si la fonction RPC n'existe pas
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from("pizzerias")
-      .select("id, name, address, status")
+    // Commandes récentes - Test simple d'abord
+    console.log("Récupération des commandes récentes...")
+    const { data: orders, error: ordersError } = await supabase
+      .from("orders")
+      .select("id, total, status, created_at, customer_id, pizzeria_id")
+      .order("created_at", { ascending: false })
       .limit(5)
 
-    if (fallbackError) {
-      console.error("Erreur lors de la récupération des pizzerias:", fallbackError)
-      throw new Error("Impossible de récupérer les pizzerias")
+    if (ordersError) {
+      console.error("Erreur lors de la récupération des commandes:", ordersError)
+      throw ordersError
     }
 
+    console.log("Commandes récupérées:", orders)
+
+    // Récupérer les pizzerias associées
+    console.log("Récupération des pizzerias...")
+    const pizzeriaIds = orders.map(order => order.pizzeria_id)
+    const { data: pizzerias, error: pizzeriasError } = await supabase
+      .from("pizzerias")
+      .select("id, name")
+      .in("id", pizzeriaIds)
+
+    if (pizzeriasError) {
+      console.error("Erreur lors de la récupération des pizzerias:", pizzeriasError)
+      throw pizzeriasError
+    }
+
+    console.log("Pizzerias récupérées:", pizzerias)
+
+    // Map des pizzerias
+    const pizzeriasMap = new Map(
+      pizzerias.map(pizzeria => [pizzeria.id, pizzeria])
+    )
+
+    // Formater les commandes récentes
+    const formattedOrders = orders.map(order => ({
+      id: order.id,
+      total: order.total,
+      status: order.status,
+      created_at: order.created_at,
+      customer_name: "Utilisateur", // Valeur par défaut pour le moment
+      customer_email: "email@example.com", // Valeur par défaut pour le moment
+      pizzeria_name: pizzeriasMap.get(order.pizzeria_id)?.name || "Pizzeria inconnue"
+    }))
+
+    // Pour le moment, retournons des données minimales pour tester
     return {
-      total_orders: totalOrders || 0,
-      total_revenue: totalRevenue,
-      total_pizzerias: totalPizzerias || 0,
-      total_users: totalUsers || 0,
-      orders_by_status: ordersByStatus,
-      tickets_by_status: ticketsByStatus,
-      recent_orders: recentOrdersData,
-      recent_tickets: recentTicketsData,
-      top_pizzerias: fallbackData,
+      total_orders: orders.length,
+      total_revenue: orders.reduce((sum, order) => sum + (order.total || 0), 0),
+      total_pizzerias: pizzerias.length,
+      total_users: 0,
+      orders_by_status: {
+        confirmed: 0,
+        preparing: 0,
+        delivering: 0,
+        delivered: 0,
+        cancelled: 0
+      },
+      tickets_by_status: {
+        open: 0,
+        pending: 0,
+        closed: 0
+      },
+      recent_orders: formattedOrders,
+      recent_tickets: [],
+      top_pizzerias: pizzerias.map(p => ({
+        id: p.id,
+        name: p.name,
+        address: "",
+        status: "active"
+      }))
     }
-  }
 
-  return {
-    total_orders: totalOrders || 0,
-    total_revenue: totalRevenue,
-    total_pizzerias: totalPizzerias || 0,
-    total_users: totalUsers || 0,
-    orders_by_status: ordersByStatus,
-    tickets_by_status: ticketsByStatus,
-    recent_orders: recentOrdersData,
-    recent_tickets: recentTicketsData,
-    top_pizzerias: topPizzeriasData,
+  } catch (error) {
+    console.error("Erreur dans getDashboardStats:", error)
+    throw error
   }
 }
 

@@ -117,7 +117,7 @@ export default function DashboardClient({ stats }: DashboardClientProps) {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">{formatPrice(order.total)}</p>
-                      <p className="text-sm text-muted-foreground">{order.pizzerias.name}</p>
+                      <p className="text-sm text-muted-foreground">{order.pizzeria_name}</p>
                     </div>
                   </div>
                 ))}
@@ -152,15 +152,15 @@ export default function DashboardClient({ stats }: DashboardClientProps) {
                       <div className="h-10 w-10 rounded-full overflow-hidden">
                         <Avatar className="h-10 w-10">
                           <AvatarImage
-                            src={ticket.users.avatar_url || "/placeholder.svg?height=40&width=40"}
-                            alt={ticket.users.name}
+                            src="/placeholder.svg?height=40&width=40"
+                            alt={ticket.user_name}
                           />
-                          <AvatarFallback>{ticket.users.name.charAt(0)}</AvatarFallback>
+                          <AvatarFallback>{ticket.user_name.charAt(0)}</AvatarFallback>
                         </Avatar>
                       </div>
                       <div>
                         <p className="font-medium">{ticket.subject}</p>
-                        <p className="text-sm text-muted-foreground">{ticket.users.name}</p>
+                        <p className="text-sm text-muted-foreground">{ticket.user_name}</p>
                       </div>
                     </div>
                     <div>

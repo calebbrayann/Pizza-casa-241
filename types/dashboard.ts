@@ -15,7 +15,28 @@ export interface DashboardStats {
     pending: number
     closed: number
   }
-  recent_orders: any[]
-  recent_tickets: any[]
-  top_pizzerias: any[]
+  recent_orders: Array<{
+    id: string
+    total: number
+    status: string
+    created_at: string
+    customer_name: string
+    customer_email: string
+    pizzeria_name: string
+  }>
+  recent_tickets: Array<{
+    id: string
+    subject: string
+    status: string
+    created_at: string
+    user_name: string
+    user_email: string
+  }>
+  top_pizzerias: Array<{
+    id: string
+    name: string
+    address: string
+    status: string
+    image?: string
+  }>
 }
