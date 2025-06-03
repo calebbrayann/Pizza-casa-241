@@ -35,7 +35,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const navItems = [
     {
       title: "Tableau de bord",
-      href: "/admin",
+      href: "/admin/dashboard",
       icon: <BarChart3 className="h-5 w-5" />,
     },
     {

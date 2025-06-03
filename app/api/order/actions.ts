@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/utils/supabase/server"
+import { createClient, createAdminClient } from "@/utils/supabase/server"
 import type { Order, OrderItem, OrderStatus, OrderFilter } from "@/types/order"
 import { revalidatePath } from "next/cache"
 import { format } from "date-fns"
@@ -14,36 +14,71 @@ export async function getOrders(filters?: {
   pizzeriaId?: string
 }): Promise<Order[]> {
   try {
-    const supabase = await createClient()
+    console.log("Début de getOrders...")
+    const supabase = await createAdminClient()
+    console.log("Client Supabase créé avec succès")
 
-    let query = supabase.from("orders_with_details").select("*")
+    let query = supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    console.log("Requête construite")
 
     if (filters?.status) {
       query = query.eq("status", filters.status)
+      console.log("Filtre status ajouté:", filters.status)
     }
 
     if (filters?.startDate) {
       query = query.gte("order_date", filters.startDate)
+      console.log("Filtre startDate ajouté:", filters.startDate)
     }
 
     if (filters?.endDate) {
       query = query.lte("order_date", filters.endDate)
+      console.log("Filtre endDate ajouté:", filters.endDate)
     }
 
     if (filters?.pizzeriaId) {
       query = query.eq("pizzeria_id", filters.pizzeriaId)
+      console.log("Filtre pizzeriaId ajouté:", filters.pizzeriaId)
     }
 
+    console.log("Exécution de la requête...")
     const { data: ordersData, error: ordersError } = await query
 
     if (ordersError) {
       console.error("Error fetching orders:", ordersError)
-      throw new Error("Failed to fetch orders")
+      throw ordersError
     }
 
+    console.log("Données reçues:", ordersData)
+
+    if (!ordersData) {
+      console.log("Aucune commande trouvée")
+      return []
+    }
+
+    // Récupérer toutes les pizzerias en une seule requête
+    const { data: pizzeriasData, error: pizzeriasError } = await supabase
+      .from("pizzerias")
+      .select("id, name")
+
+    if (pizzeriasError) {
+      console.error("Error fetching pizzerias:", pizzeriasError)
+    }
+
+    // Créer un map des pizzerias pour un accès rapide
+    const pizzeriasMap = new Map(
+      pizzeriasData?.map(p => [p.id, p.name]) || []
+    )
+
+    console.log("Récupération des items pour chaque commande...")
     // Récupérer les items pour chaque commande
     const ordersWithItems = await Promise.all(
       ordersData.map(async (orderData) => {
+        console.log("Récupération des items pour la commande:", orderData.id)
         const { data: itemsData, error: itemsError } = await supabase
           .from("order_items")
           .select("*")
@@ -51,37 +86,51 @@ export async function getOrders(filters?: {
 
         if (itemsError) {
           console.error("Error fetching order items:", itemsError)
-          throw new Error("Failed to fetch order items")
+          throw itemsError
         }
+
+        // Récupérer les informations de l'utilisateur
+        const { data: userData, error: userError } = await supabase
+          .from('auth.users')
+          .select('email, raw_user_meta_data')
+          .eq('id', orderData.customer_id)
+          .single()
+
+        if (userError) {
+          console.error("Error fetching user data:", userError)
+        }
+
+        const userMetadata = userData?.raw_user_meta_data || {}
 
         return {
           id: orderData.id,
           customer_id: orderData.customer_id,
-          customer_name: orderData.customer_name,
-          customer_email: orderData.customer_email,
-          customer_avatar: orderData.customer_avatar,
+          customer_name: userMetadata.name || "Utilisateur inconnu",
+          customer_email: userData?.email || "email inconnu",
+          customer_avatar: userMetadata.avatar_url || null,
           pizzeria_id: orderData.pizzeria_id,
-          pizzeria_name: orderData.pizzeria_name,
+          pizzeria_name: pizzeriasMap.get(orderData.pizzeria_id) || "Pizzeria inconnue",
           total: orderData.total,
           status: orderData.status,
           date: orderData.order_date,
           time: orderData.order_time,
           delivery_fee: orderData.delivery_fee,
           payment_method: orderData.payment_method,
-          items: itemsData.map((item) => ({
+          items: itemsData ? itemsData.map((item) => ({
             id: item.id,
             name: item.name,
             quantity: item.quantity,
             price: item.price,
-          })),
+          })) : [],
         }
       })
     )
 
+    console.log("Traitement terminé avec succès")
     return ordersWithItems
   } catch (error) {
     console.error("Error in getOrders:", error)
-    throw new Error("Erreur lors de la récupération des commandes")
+    throw error
   }
 }
 
@@ -89,21 +138,20 @@ export async function getOrders(filters?: {
 export async function getOrderById(id: string): Promise<Order | null> {
   const supabase = await createClient()
 
+  // REQUÊTE MODIFIÉE : Syntaxe de jointure mise à jour
   const { data: orderData, error } = await supabase
     .from("orders")
-    .select(
-      `
+    .select(`
       *,
-      users!orders_customer_id_fkey (
+      users:customer_id (
         name,
         email,
         avatar_url
       ),
-      pizzerias!orders_pizzeria_id_fkey (
+      pizzerias:pizzeria_id (
         name
       )
-    `,
-    )
+    `)
     .eq("id", id)
     .single()
 
@@ -131,14 +179,15 @@ export async function getOrderById(id: string): Promise<Order | null> {
   const timeParts = orderData.order_time.split(":")
   const formattedTime = `${timeParts[0]}:${timeParts[1]}`
 
+  // ACCÈS SÉCURISÉ AUX DONNÉES DES RELATIONS
   return {
     id: orderData.id,
     customer_id: orderData.customer_id,
-    customer_name: orderData.users.name,
-    customer_email: orderData.users.email,
-    customer_avatar: orderData.users.avatar_url,
+    customer_name: orderData.users?.name || "Nom inconnu",
+    customer_email: orderData.users?.email || "Email inconnu",
+    customer_avatar: orderData.users?.avatar_url || "",
     pizzeria_id: orderData.pizzeria_id,
-    pizzeria_name: orderData.pizzerias.name,
+    pizzeria_name: orderData.pizzerias?.name || "Pizzeria inconnue", // Correction ici
     total: orderData.total,
     status: orderData.status,
     date: formattedDate,
@@ -150,6 +199,9 @@ export async function getOrderById(id: string): Promise<Order | null> {
     updated_at: orderData.updated_at,
   }
 }
+
+// Les autres fonctions restent inchangées
+// ... [createOrder, updateOrderStatus, deleteOrder, getOrderStats] ...
 
 // Créer une nouvelle commande
 export async function createOrder(orderData: {
