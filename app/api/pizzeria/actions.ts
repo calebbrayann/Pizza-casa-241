@@ -5,81 +5,122 @@ import type { Pizzeria, PizzeriaFilter, PizzeriaStatus } from "@/types/pizzeria"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 
+// Tableau d'images par défaut pour les pizzerias
+const DEFAULT_PIZZERIA_IMAGES = [
+  "https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1000&auto=format&fit=crop",  // Pizza appétissante
+  "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop",     // Intérieur de pizzeria
+  "https://images.unsplash.com/photo-1593504049359-74330189a345?q=80&w=1000&auto=format&fit=crop",  // Four à pizza
+  "https://images.unsplash.com/photo-1590947132387-155cc02f3212?q=80&w=1000&auto=format&fit=crop",  // Pizza margherita
+  "https://images.unsplash.com/photo-1579751626657-72bc17010498?q=80&w=1000&auto=format&fit=crop"   // Pizzaiolo au travail
+];
+
 // Récupérer toutes les pizzerias avec filtrage
 export async function getPizzerias(filter?: PizzeriaFilter): Promise<Pizzeria[]> {
-  const supabase = await createClient()
+  try {
+    console.log("1. Début de la récupération des pizzerias")
+    
+    const supabase = await createAdminClient()
+    console.log("2. Client Supabase créé avec succès")
 
-  let query = supabase
-    .from("pizzerias")
-    .select("*")
-    .order("name")
+    // Faire une requête simple pour voir la structure des données
+    const { data, error } = await supabase
+      .from("pizzerias")
+      .select("*")
 
-  // Appliquer les filtres
-  if (filter) {
-    if (filter.status) {
-      query = query.eq("status", filter.status)
+    if (error) {
+      console.error("Erreur détaillée lors de la requête:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+      throw new Error(`Erreur lors de la requête: ${error.message}`)
     }
 
-    if (filter.search) {
-      query = query.or(`name.ilike.%${filter.search}%,address.ilike.%${filter.search}%`)
+    // Loguer les données pour inspection
+    console.log("Données brutes des pizzerias:", data)
+
+    if (!data) {
+      console.log("Aucune donnée retournée")
+      return []
     }
+
+    // Transformation simple des données sans les relations pour l'instant
+    return data.map((pizzeria: any) => ({
+      id: pizzeria.id,
+      name: pizzeria.name,
+      // Utiliser l'image de la base de données
+      image: pizzeria.image || "/placeholder.svg?height=200&width=300",
+      rating: pizzeria.rating || 0,
+      address: pizzeria.address,
+      phone: pizzeria.phone,
+      opening_hours: pizzeria.opening_hours || {},
+      tags: pizzeria.tags || [],
+      status: pizzeria.status || "inactive",
+      orders_count: 0, // Temporairement mis à 0
+      revenue: 0, // Temporairement mis à 0
+      description: pizzeria.description || "",
+      created_at: pizzeria.created_at,
+      updated_at: pizzeria.updated_at,
+    }))
+  } catch (error) {
+    console.error("Erreur complète dans getPizzerias:", error)
+    if (error instanceof Error) {
+      throw new Error(`Erreur lors de la récupération des pizzerias: ${error.message}`)
+    }
+    throw new Error("Une erreur inattendue s'est produite")
   }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error("Erreur lors de la récupération des pizzerias:", error)
-    throw new Error("Impossible de récupérer les pizzerias")
-  }
-
-  // Transformer les données
-  return data.map((pizzeria) => ({
-    id: pizzeria.id,
-    name: pizzeria.name,
-    image: pizzeria.image || "/placeholder.svg?height=200&width=300",
-    rating: pizzeria.rating,
-    address: pizzeria.address,
-    phone: pizzeria.phone,
-    opening_hours: pizzeria.opening_hours,
-    tags: pizzeria.tags || [],
-    status: pizzeria.status,
-    orders_count: 0, // Valeur par défaut
-    revenue: pizzeria.revenue || 0,
-    description: pizzeria.description,
-    created_at: pizzeria.created_at,
-    updated_at: pizzeria.updated_at,
-  }))
 }
 
 // Récupérer une pizzeria par ID
 export async function getPizzeriaById(id: string): Promise<Pizzeria | null> {
-  const cookieStore = cookies()
-  const supabase = await createClient(cookieStore)
+  try {
+    const supabase = await createAdminClient()
 
-  const { data, error } = await supabase.from("pizzerias").select("*").eq("id", id).single()
+    // Récupérer la pizzeria avec ses commandes
+    const { data, error } = await supabase
+      .from("pizzerias")
+      .select(`
+        *,
+        orders (
+          id,
+          total
+        )
+      `)
+      .eq("id", id)
+      .single()
 
-  if (error) {
-    console.error("Erreur lors de la récupération de la pizzeria:", error)
+    if (error) {
+      console.error("Erreur lors de la récupération de la pizzeria:", error)
+      throw error
+    }
+
+    if (!data) return null
+
+    // Calculer le nombre de commandes et le revenu total
+    const orders = data.orders || []
+    const ordersCount = orders.length
+    const revenue = orders.reduce((total, order) => total + (order.total || 0), 0)
+
+    return {
+      id: data.id,
+      name: data.name,
+      image: data.image_url || "/placeholder.svg?height=200&width=300",
+      rating: data.rating || 0,
+      address: data.address,
+      phone: data.phone,
+      opening_hours: data.opening_hours || {},
+      tags: data.tags || [],
+      status: data.status || "inactive",
+      orders_count: ordersCount,
+      revenue: revenue,
+      description: data.description || "",
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    }
+  } catch (error) {
+    console.error("Erreur dans getPizzeriaById:", error)
     return null
-  }
-
-  if (!data) return null
-
-  return {
-    id: data.id,
-    name: data.name,
-    image: data.image || "/placeholder.svg?height=200&width=300",
-    rating: data.rating,
-    address: data.address,
-    phone: data.phone,
-    opening_hours: data.opening_hours,
-    tags: data.tags || [],
-    status: data.status,
-    orders_count: data.orders_count || 0,
-    revenue: data.revenue || 0,
-    description: data.description,
-    created_at: data.created_at,
-    updated_at: data.updated_at,
   }
 }
 

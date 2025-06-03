@@ -9,21 +9,21 @@ import { v4 as uuidv4 } from 'uuid'
 // Récupérer tous les utilisateurs avec filtrage
 export async function getUsers(filter?: UserFilter): Promise<User[]> {
   try {
-    console.log("Début de la récupération des utilisateurs")
     const supabase = await createClient()
-    console.log("Client Supabase créé")
 
+    // Récupérer les utilisateurs avec leurs adresses et commandes
     let query = supabase
-      .from("users")
+      .from("profiles")
       .select(`
         *,
-        addresses(*)
+        orders (
+          id,
+          total
+        )
       `)
-    console.log("Requête de base créée")
 
     // Appliquer les filtres
     if (filter) {
-      console.log("Filtres appliqués:", filter)
       if (filter.status) {
         query = query.eq("status", filter.status)
       }
@@ -33,89 +33,98 @@ export async function getUsers(filter?: UserFilter): Promise<User[]> {
       }
 
       if (filter.search) {
-        query = query.or(`name.ilike.%${filter.search}%,email.ilike.%${filter.search}%`)
+        query = query.or(`full_name.ilike.%${filter.search}%,email.ilike.%${filter.search}%`)
       }
     }
 
-    console.log("Exécution de la requête...")
     const { data, error } = await query
 
     if (error) {
-      console.error("Erreur détaillée lors de la récupération des utilisateurs:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      })
-      throw new Error(`Erreur lors de la récupération des utilisateurs: ${error.message}`)
+      console.error("Erreur lors de la récupération des utilisateurs:", error)
+      throw error
     }
 
     if (!data) {
-      console.log("Aucune donnée retournée")
       return []
     }
 
-    console.log(`${data.length} utilisateurs trouvés`)
-
     // Formater les données pour correspondre à notre type User
-    return data.map((user) => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatar_url: user.avatar_url,
-      status: user.status,
-      role: user.role,
-      registered_date: new Date(user.created_at).toLocaleDateString("fr-FR"),
-      orders_count: 0, // Valeur par défaut jusqu'à ce que la table orders soit créée
-      total_spent: 0, // Valeur par défaut jusqu'à ce que la table orders soit créée
-      last_login: user.last_login ? formatLastLogin(new Date(user.last_login)) : "Jamais",
-      addresses: user.addresses || [],
-      created_at: user.created_at,
-      updated_at: user.updated_at,
-    }))
+    return data.map((user) => {
+      // Calculer le nombre de commandes et le total dépensé
+      const orders = user.orders || []
+      const ordersCount = orders.length
+      const totalSpent = orders.reduce((total, order) => total + (order.total || 0), 0)
+
+      return {
+        id: user.id,
+        name: user.full_name || "Utilisateur sans nom",
+        email: user.email || "Email inconnu",
+        avatar_url: user.avatar_url || null,
+        status: user.status || "active",
+        role: user.role || "user",
+        registered_date: new Date(user.created_at).toLocaleDateString("fr-FR"),
+        orders_count: ordersCount,
+        total_spent: totalSpent,
+        last_login: user.last_sign_in_at ? formatLastLogin(new Date(user.last_sign_in_at)) : "Jamais",
+        addresses: user.addresses || [],
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      }
+    })
   } catch (error) {
-    console.error("Erreur complète:", error)
-    if (error instanceof Error) {
-      throw new Error(`Erreur lors de la récupération des utilisateurs: ${error.message}`)
-    }
-    throw new Error("Une erreur inattendue s'est produite")
+    console.error("Erreur dans getUsers:", error)
+    throw error
   }
 }
 
 // Récupérer un utilisateur par ID
 export async function getUserById(id: string): Promise<User | null> {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from("users")
-    .select(`
-      *,
-      addresses(*)
-    `)
-    .eq("id", id)
-    .single()
+    // Récupérer l'utilisateur avec ses commandes
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(`
+        *,
+        orders (
+          id,
+          total
+        )
+      `)
+      .eq("id", id)
+      .single()
 
-  if (error) {
-    console.error("Erreur lors de la récupération de l'utilisateur:", error)
+    if (error) {
+      console.error("Erreur lors de la récupération de l'utilisateur:", error)
+      throw error
+    }
+
+    if (!data) return null
+
+    // Calculer le nombre de commandes et le total dépensé
+    const orders = data.orders || []
+    const ordersCount = orders.length
+    const totalSpent = orders.reduce((total, order) => total + (order.total || 0), 0)
+
+    return {
+      id: data.id,
+      name: data.full_name || "Utilisateur sans nom",
+      email: data.email || "Email inconnu",
+      avatar_url: data.avatar_url || null,
+      status: data.status || "active",
+      role: data.role || "user",
+      registered_date: new Date(data.created_at).toLocaleDateString("fr-FR"),
+      orders_count: ordersCount,
+      total_spent: totalSpent,
+      last_login: data.last_sign_in_at ? formatLastLogin(new Date(data.last_sign_in_at)) : "Jamais",
+      addresses: data.addresses || [],
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    }
+  } catch (error) {
+    console.error("Erreur dans getUserById:", error)
     return null
-  }
-
-  if (!data) return null
-
-  return {
-    id: data.id,
-    name: data.name,
-    email: data.email,
-    avatar_url: data.avatar_url,
-    status: data.status,
-    role: data.role,
-    registered_date: new Date(data.created_at).toLocaleDateString("fr-FR"),
-    orders_count: 0, // Valeur par défaut jusqu'à ce que la table orders soit créée
-    total_spent: 0, // Valeur par défaut jusqu'à ce que la table orders soit créée
-    last_login: data.last_login ? formatLastLogin(new Date(data.last_login)) : "Jamais",
-    addresses: data.addresses || [],
-    created_at: data.created_at,
-    updated_at: data.updated_at,
   }
 }
 

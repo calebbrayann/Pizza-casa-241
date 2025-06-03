@@ -14,189 +14,229 @@ export async function getOrders(filters?: {
   pizzeriaId?: string
 }): Promise<Order[]> {
   try {
-    console.log("Début de getOrders...")
+    console.log("1. Début de la récupération des commandes")
     const supabase = await createAdminClient()
-    console.log("Client Supabase créé avec succès")
+    console.log("2. Client Supabase créé avec succès")
 
+    // Commençons par une requête simple pour vérifier la structure
+    console.log("3. Tentative de requête simple sur la table orders")
+    const { data: simpleData, error: simpleError } = await supabase
+      .from("orders")
+      .select()
+
+    if (simpleError) {
+      console.error("4. Erreur lors de la requête simple:", {
+        message: simpleError.message,
+        details: simpleError.details,
+        hint: simpleError.hint,
+        code: simpleError.code
+      })
+      throw simpleError
+    }
+
+    console.log("4. Données brutes de la requête simple:", simpleData)
+
+    // Si nous n'avons pas d'erreur mais pas de données, la table est peut-être vide
+    if (!simpleData || simpleData.length === 0) {
+      console.log("5. La table orders est vide")
+      return []
+    }
+
+    // Construction de la requête complète avec les relations
+    console.log("6. Construction de la requête avec relations")
     let query = supabase
       .from("orders")
-      .select("*")
-      .order("created_at", { ascending: false })
+      .select(`
+        *,
+        pizzeria:pizzerias (
+          id,
+          name
+        ),
+        order_items (
+          id,
+          name,
+          quantity,
+          price
+        )
+      `)
 
-    console.log("Requête construite")
-
+    // Application des filtres
     if (filters?.status) {
       query = query.eq("status", filters.status)
-      console.log("Filtre status ajouté:", filters.status)
     }
 
     if (filters?.startDate) {
       query = query.gte("order_date", filters.startDate)
-      console.log("Filtre startDate ajouté:", filters.startDate)
     }
 
     if (filters?.endDate) {
       query = query.lte("order_date", filters.endDate)
-      console.log("Filtre endDate ajouté:", filters.endDate)
     }
 
     if (filters?.pizzeriaId) {
       query = query.eq("pizzeria_id", filters.pizzeriaId)
-      console.log("Filtre pizzeriaId ajouté:", filters.pizzeriaId)
     }
 
-    console.log("Exécution de la requête...")
+    console.log("7. Exécution de la requête complète")
     const { data: ordersData, error: ordersError } = await query
 
     if (ordersError) {
-      console.error("Error fetching orders:", ordersError)
+      console.error("8. Erreur lors de la requête complète:", {
+        message: ordersError.message,
+        details: ordersError.details,
+        hint: ordersError.hint,
+        code: ordersError.code
+      })
       throw ordersError
     }
 
-    console.log("Données reçues:", ordersData)
-
     if (!ordersData) {
-      console.log("Aucune commande trouvée")
+      console.log("9. Aucune donnée retournée par la requête complète")
       return []
     }
 
-    // Récupérer toutes les pizzerias en une seule requête
-    const { data: pizzeriasData, error: pizzeriasError } = await supabase
-      .from("pizzerias")
-      .select("id, name")
+    console.log("9. Données complètes récupérées:", ordersData)
 
-    if (pizzeriasError) {
-      console.error("Error fetching pizzerias:", pizzeriasError)
+    // Récupérer les informations des clients
+    const customerIds = ordersData.map(order => order.customer_id).filter(Boolean)
+    console.log("10. IDs des clients à récupérer:", customerIds)
+
+    if (customerIds.length === 0) {
+      console.log("11. Aucun ID client à récupérer")
+      return ordersData.map(orderData => formatOrder(orderData))
     }
 
-    // Créer un map des pizzerias pour un accès rapide
-    const pizzeriasMap = new Map(
-      pizzeriasData?.map(p => [p.id, p.name]) || []
-    )
+    const { data: customersData, error: customersError } = await supabase
+      .from("profiles")
+      .select("id, email, full_name, avatar_url")
+      .in("id", customerIds)
 
-    console.log("Récupération des items pour chaque commande...")
-    // Récupérer les items pour chaque commande
-    const ordersWithItems = await Promise.all(
-      ordersData.map(async (orderData) => {
-        console.log("Récupération des items pour la commande:", orderData.id)
-        const { data: itemsData, error: itemsError } = await supabase
-          .from("order_items")
-          .select("*")
-          .eq("order_id", orderData.id)
-
-        if (itemsError) {
-          console.error("Error fetching order items:", itemsError)
-          throw itemsError
-        }
-
-        // Récupérer les informations de l'utilisateur
-        const { data: userData, error: userError } = await supabase
-          .from('auth.users')
-          .select('email, raw_user_meta_data')
-          .eq('id', orderData.customer_id)
-          .single()
-
-        if (userError) {
-          console.error("Error fetching user data:", userError)
-        }
-
-        const userMetadata = userData?.raw_user_meta_data || {}
-
-        return {
-          id: orderData.id,
-          customer_id: orderData.customer_id,
-          customer_name: userMetadata.name || "Utilisateur inconnu",
-          customer_email: userData?.email || "email inconnu",
-          customer_avatar: userMetadata.avatar_url || null,
-          pizzeria_id: orderData.pizzeria_id,
-          pizzeria_name: pizzeriasMap.get(orderData.pizzeria_id) || "Pizzeria inconnue",
-          total: orderData.total,
-          status: orderData.status,
-          date: orderData.order_date,
-          time: orderData.order_time,
-          delivery_fee: orderData.delivery_fee,
-          payment_method: orderData.payment_method,
-          items: itemsData ? itemsData.map((item) => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-          })) : [],
-        }
+    if (customersError) {
+      console.error("12. Erreur lors de la récupération des clients:", {
+        message: customersError.message,
+        details: customersError.details,
+        hint: customersError.hint,
+        code: customersError.code
       })
+      // On continue même si on n'a pas les données clients
+      console.log("13. Continuation sans données clients")
+      return ordersData.map(orderData => formatOrder(orderData))
+    }
+
+    console.log("12. Données des clients récupérées:", customersData)
+
+    // Créer un map des clients pour un accès rapide
+    const customersMap = new Map(
+      customersData?.map(customer => [customer.id, customer]) || []
     )
 
-    console.log("Traitement terminé avec succès")
-    return ordersWithItems
+    // Formater les commandes avec toutes les informations
+    console.log("13. Formatage des commandes")
+    const formattedOrders = ordersData.map(orderData => {
+      const customer = customersMap.get(orderData.customer_id)
+      return formatOrder(orderData, customer)
+    })
+
+    console.log("14. Commandes formatées avec succès")
+    return formattedOrders
   } catch (error) {
-    console.error("Error in getOrders:", error)
+    console.error("Erreur complète dans getOrders:", error)
     throw error
+  }
+}
+
+// Fonction utilitaire pour formater une commande
+function formatOrder(orderData: any, customer?: any): Order {
+  const orderDate = orderData.order_date && orderData.order_time
+    ? new Date(`${orderData.order_date}T${orderData.order_time}`)
+    : new Date(orderData.created_at)
+
+  return {
+    id: orderData.id,
+    customer_id: orderData.customer_id,
+    customer_name: customer?.full_name || "Utilisateur inconnu",
+    customer_email: customer?.email || "Email inconnu",
+    customer_avatar: customer?.avatar_url || null,
+    pizzeria_id: orderData.pizzeria_id,
+    pizzeria_name: orderData.pizzeria?.name || "Pizzeria inconnue",
+    total: orderData.total,
+    status: orderData.status,
+    date: format(orderDate, "dd/MM/yyyy", { locale: fr }),
+    time: format(orderDate, "HH:mm", { locale: fr }),
+    delivery_fee: orderData.delivery_fee,
+    payment_method: orderData.payment_method,
+    items: orderData.order_items || [],
+    created_at: orderData.created_at,
+    updated_at: orderData.updated_at
   }
 }
 
 // Récupérer une commande par ID
 export async function getOrderById(id: string): Promise<Order | null> {
-  const supabase = await createClient()
+  try {
+    const supabase = await createAdminClient()
 
-  // REQUÊTE MODIFIÉE : Syntaxe de jointure mise à jour
-  const { data: orderData, error } = await supabase
-    .from("orders")
-    .select(`
-      *,
-      users:customer_id (
-        name,
-        email,
-        avatar_url
-      ),
-      pizzerias:pizzeria_id (
-        name
-      )
-    `)
-    .eq("id", id)
-    .single()
+    // Récupérer la commande avec ses relations
+    const { data: orderData, error: orderError } = await supabase
+      .from("orders")
+      .select(`
+        *,
+        pizzerias (
+          id,
+          name
+        ),
+        order_items (
+          id,
+          name,
+          quantity,
+          price
+        )
+      `)
+      .eq("id", id)
+      .single()
 
-  if (error) {
-    console.error("Erreur lors de la récupération de la commande:", error)
+    if (orderError) {
+      console.error("Erreur lors de la récupération de la commande:", orderError)
+      throw orderError
+    }
+
+    // Récupérer les informations du client
+    const { data: customerData, error: customerError } = await supabase
+      .from("profiles")
+      .select("id, email, full_name, avatar_url")
+      .eq("id", orderData.customer_id)
+      .single()
+
+    if (customerError) {
+      console.error("Erreur lors de la récupération du client:", customerError)
+      throw customerError
+    }
+
+    // Formater la date et l'heure
+    const orderDate = new Date(orderData.created_at)
+
+    // Retourner la commande formatée
+    return {
+      id: orderData.id,
+      customer_id: orderData.customer_id,
+      customer_name: customerData?.full_name || "Utilisateur inconnu",
+      customer_email: customerData?.email || "Email inconnu",
+      customer_avatar: customerData?.avatar_url || null,
+      pizzeria_id: orderData.pizzeria_id,
+      pizzeria_name: orderData.pizzerias?.name || "Pizzeria inconnue",
+      total: orderData.total,
+      status: orderData.status,
+      date: format(orderDate, "dd/MM/yyyy", { locale: fr }),
+      time: format(orderDate, "HH:mm", { locale: fr }),
+      items: orderData.order_items || [],
+      delivery_fee: orderData.delivery_fee,
+      payment_method: orderData.payment_method,
+      created_at: orderData.created_at,
+      updated_at: orderData.updated_at
+    }
+  } catch (error) {
+    console.error("Erreur dans getOrderById:", error)
     return null
-  }
-
-  // Récupérer les articles de la commande
-  const { data: orderItems, error: itemsError } = await supabase
-    .from("order_items")
-    .select("*")
-    .eq("order_id", orderData.id)
-
-  if (itemsError) {
-    console.error("Erreur lors de la récupération des articles de commande:", itemsError)
-    return null
-  }
-
-  // Formater la date pour l'affichage
-  const orderDate = new Date(orderData.order_date)
-  const formattedDate = format(orderDate, "dd/MM/yyyy", { locale: fr })
-
-  // Formater l'heure pour l'affichage
-  const timeParts = orderData.order_time.split(":")
-  const formattedTime = `${timeParts[0]}:${timeParts[1]}`
-
-  // ACCÈS SÉCURISÉ AUX DONNÉES DES RELATIONS
-  return {
-    id: orderData.id,
-    customer_id: orderData.customer_id,
-    customer_name: orderData.users?.name || "Nom inconnu",
-    customer_email: orderData.users?.email || "Email inconnu",
-    customer_avatar: orderData.users?.avatar_url || "",
-    pizzeria_id: orderData.pizzeria_id,
-    pizzeria_name: orderData.pizzerias?.name || "Pizzeria inconnue", // Correction ici
-    total: orderData.total,
-    status: orderData.status,
-    date: formattedDate,
-    time: formattedTime,
-    items: orderItems as OrderItem[],
-    delivery_fee: orderData.delivery_fee,
-    payment_method: orderData.payment_method,
-    created_at: orderData.created_at,
-    updated_at: orderData.updated_at,
   }
 }
 

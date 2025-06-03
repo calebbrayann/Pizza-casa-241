@@ -53,12 +53,18 @@ export const createClient = async () => {
 export const createAdminClient = async () => {
   try {
     console.log("Création du client Supabase Admin...")
+    console.log("URL Supabase:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log("Service Role Key existe:", !!process.env.SUPABASE_SERVICE_ROLE_KEY)
     
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Les variables d'environnement Supabase ne sont pas configurées")
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      throw new Error("NEXT_PUBLIC_SUPABASE_URL n'est pas configuré")
     }
 
-    return createServerClient(
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY n'est pas configuré")
+    }
+
+    const client = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY,
       {
@@ -69,8 +75,20 @@ export const createAdminClient = async () => {
         },
       }
     )
+
+    // Test de la connexion
+    console.log("Test de la connexion Supabase...")
+    const { data, error } = await client.from("pizzerias").select("count").limit(1)
+    
+    if (error) {
+      console.error("Erreur lors du test de connexion:", error)
+      throw error
+    }
+
+    console.log("Connexion Supabase Admin réussie")
+    return client
   } catch (error) {
-    console.error("Erreur lors de la création du client Supabase Admin:", error)
+    console.error("Erreur détaillée lors de la création du client Supabase Admin:", error)
     throw error
   }
 }
